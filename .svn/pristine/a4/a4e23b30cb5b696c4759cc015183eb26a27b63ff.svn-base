@@ -1,0 +1,125 @@
+import System.Random
+import System.Environment
+import Text.Read
+import Data.Maybe
+
+--main :: IO ()
+--main = do a <- getArgs
+  --        let s = readMaybe (a !! 0)
+    --      let l = readMaybe (a !! 1)
+      --    if length a == 2 && isJust s && isJust l && fromJust s >= 5 && odd (fromJust s)
+        --     then putStr $ unlines $ mapa (fromJust s) (fromJust l)
+          --   else putStrLn "Parâmetros inválidos"
+
+--calcular o número de calhaus e espaços que vão ser preenchidos aleatóriamente ((n - 2)² - 12 - (nº de calhaus))
+nBoulders :: Int -> Int
+nBoulders n = (nlevel n) * (nlevel n) where 
+    nlevel 5 = 1
+    nlevel x = 1 + nlevel (x - 2)
+
+nRandomBlocks :: Int -> Int
+nRandomBlocks x = (x-2)^2 - 12 - nBoulders x
+
+--gerar uma lista aleatória de números correspondentes a tijolos, PUps e espaços vazios 
+randomize :: Int -> Int -> [Int]
+randomize size seed = take (nRandomBlocks size) $ randomRs (0,99) (mkStdGen seed)
+
+--tabela de valores correspondentes ao randomize
+isBomb :: Int -> Bool
+isBomb x = if (x == 0 || x == 1) then True else False
+---‘+’
+isFlame :: Int -> Bool
+isFlame x = if (x == 2 || x == 3) then True else False
+---‘!’
+isBrick :: Int -> Bool
+isBrick x = if (x >= 4 && x <= 39) then True else False
+--‘?’
+isEmpty :: Int -> Bool
+isEmpty x = if (x >= 40 && x <= 99) then True else False
+--' '
+-- deixar expressa para depois ler as coordenadas
+-- Passar a lista RANDOMIZE para caracteres
+randomize_to_String :: [Int] -> String
+randomize_to_String [] = [] -- quando a dimensão é 5 
+randomize_to_String (x:xs) | isEmpty x = " " ++ randomize_to_String xs
+                           | otherwise = "?" ++ randomize_to_String xs
+-------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------
+-- linha de cima e linha de baixo
+drawLine_CB :: Int -> Int -> String
+drawLine_CB _ 0 = "\n"
+drawLine_CB l size = "#" ++ drawLine_CB l (size - 1)
+-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
+--função para a linha 2 e linha size - 1):
+drawLine_L2 :: Int -> Int -> String -> String
+drawLine_L2 _ _ [] = "#   #" -- quando a dimensão é 5
+drawLine_L2 c size lista | c == 1 = "#" ++ drawLine_L2 2 size lista
+                         | c == 2 = " " ++ drawLine_L2 3 size lista
+                         | c == 3 = " " ++ drawLine_L2 4 size lista
+                         | c > 3 && c < (size-2) = [head lista] ++ drawLine_L2 (c+1) size (tail lista) 
+                         | c == (size-2) =  " " ++ drawLine_L2 (size-1) size lista
+                         | c == (size-1) =  " " ++ drawLine_L2 size size lista
+                         | c == size = "#\n" 
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+--função para a linha 3 e linha size - 2):
+drawLine_L3 :: Int -> Int -> String -> String
+drawLine_L3 _ _ [] = "# # #"
+drawLine_L3 c size lista | c == 1 = "#" ++ drawLine_L3 2 size lista
+                         | c == 2 = " " ++ drawLine_L3 3 size lista
+                         | c == 3 = "#" ++ drawLine_L3 4 size lista
+                         | c > 3 && c < (size-2) = [head lista] ++ "#" ++ drawLine_L3 (c+2) size (tail lista) 
+                         | c == (size-2) =  "#" ++ drawLine_L3 (size-1) size lista
+                         | c == (size-1) =  " " ++ drawLine_L3 size size lista
+                         | c == size = "#\n" 
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+--função para as linhas do meio e pares:
+drawLine_Leven :: Int -> Int -> String -> String
+drawLine_Leven _ _ [] = "#   #"
+drawLine_Leven c size lista | c == 1 = "#" ++ drawLine_Leven 2 size lista
+                            | c > 1 && c < size = [head lista] ++ drawLine_Leven (c+1) size (tail lista) 
+                            | c == size = "#\n" 
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+--função para as linhas do meio e impares:
+drawLine_Lodd :: Int -> Int -> String -> String
+drawLine_Lodd _ _ [] = "#   #"
+drawLine_Lodd c size lista | c == 1 = "#" ++ drawLine_Lodd 2 size lista
+                           | c > 1 && c < (size-1) = [head lista] ++ "#" ++ drawLine_Lodd (c+2) size (tail lista)
+                           | c == (size-1) = [head lista] ++ "#\n"
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+-- print FINAL do mapa (apenas linha a linhas):
+drawMap :: Int -> Int -> Int -> String -> String
+drawMap 0 _ _ _ = error "Condição impossivel: linha =/ 0!"
+drawMap _ 0 _ _ = error "Condição impossivel: coluna =/ 0!"
+drawMap l c size lista | l == 1 = drawLine_CB 1 size
+                       | l == 2 = drawLine_L2 1 size lista
+                       | l == 3 = drawLine_L3 1 size (newList l lista size) 
+                       | l > 3 && l < (size-2) && (even l == True) = drawLine_Leven 1 size lista 
+                       | l > 3 && l < (size-2) && (even l == False) = drawLine_Lodd 1 size lista 
+                       | l == (size-2) = drawLine_L3 1 size lista  --nota: a lista nao pode ser a mesma (senao temos duas linhas equivalentes)
+                       | l == (size-1) = drawLine_L2 1 size lista --nota: a lista nao pode ser a mesma (senao temos duas linhas equivalentes)
+                       | l == size = drawLine_CB 1 size
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+-- IMPORTANTE:
+-- fazer uma função para retirar à lista os elementos ja usados do randomize_to_String: nBoulders
+-- ao mandar usar a linha > 3 no (drawMap l c size lista) está sempre a atualizar a linha
+newList :: Eq a => Int -> [a] -> Int -> [a]
+newList _ [] _ = []
+newList l lista size | l == 3 = drop (size-6) lista
+                     -- l > 3 && l < (size-2) && (even l == True) = 
+                     --l > 3 && l < (size-2) && (even l == False) =
+                     --l == (size-2) =   
+                     --l == (size-1) =   
+----------------------------------------------------------------------------------
+----------------------------------------------------------------------------------
+--drawMapFinal :: Int -> Int -> Int -> String -> String
+--drawMapFinal 
+
+
+--mapa :: Int -> Int -> [String]
+--mapa n s = drawMapTOTAL l c size (randomize_to_String (randomize size seed)) ++ (findBombs n n n (randomize_to_String (randomize size seed)) ++ (findFlames n n n (randomize_to_String (randomize size seed))

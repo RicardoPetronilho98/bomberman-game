@@ -1,0 +1,23 @@
+\relax 
+\catcode `"\active 
+\select@language{portuges}
+\@writefile{toc}{\select@language{portuges}}
+\@writefile{lof}{\select@language{portuges}}
+\@writefile{lot}{\select@language{portuges}}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introdu\IeC {\c c}\IeC {\~a}o}{1}}
+\newlabel{sec:intro}{{1}{1}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Descri\IeC {\c c}\IeC {\~a}o do Problema}{2}}
+\newlabel{sec:problema}{{2}{2}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Concep\IeC {\c c}\IeC {\~a}o da Solu\IeC {\c c}\IeC {\~a}o}{2}}
+\newlabel{sec:solucao}{{3}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Estruturas de Dados}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Implementa\IeC {\c c}\IeC {\~a}o}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Testes}{5}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Conclus\IeC {\~o}es}{6}}
+\newlabel{sec:conclusao}{{4}{6}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Anexos}{6}}
+\newlabel{sec:anexos}{{5}{6}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces exemplo 8 no svn}}{7}}
+\newlabel{img: teste1}{{1}{7}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces instante 150 do exemplo 8}}{7}}
+\newlabel{img: solucao1}{{2}{7}}

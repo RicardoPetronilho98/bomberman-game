@@ -1,0 +1,69 @@
+import Data.Char (isDigit)
+import System.Environment
+   
+
+{-
+justMap :: Int -> Int -> [String]
+justMap n s = splitString n (drawMap n n n (randomize n s))
+
+skinMap :: [String] -> [String]
+skinMap map = skinMapAux (drop 1 (reverse(drop 1 (reverse map)))) where
+	skinMapAux [] = []
+	skinMapAux (h:t) = (drop 1 (reverse(drop 1 (reverse h)))) : skinMapAux t
+
+mapInside :: Int -> Int -> [String]
+mapInside n s = skinMap (justMap n s)
+
+getElement :: [String] -> Int -> Int -> Char
+getElement (h:t) x y | y == 1 = getElementX h x
+					 | otherwise = getElement t x (y-1)
+
+getElementX :: String -> Int -> Char
+getElementX (h:t) 1 = h
+getElementX (h:t) x = getElementX t (x-1)
+
+switchElement :: [String] -> Int -> Int -> Char -> [String]
+switchElement (h:t) x y c | y == 1 = (switchElementX h x c) : t
+						  | otherwise = h : switchElement t x (y-1) c
+
+switchElementX :: String -> Int -> Char -> String
+switchElementX string 1 c = c : (drop 1 string)
+switchElementX (h:t) x c = h : switchElementX t (x-1) c  
+
+walk :: [String] -> Char -> Char -> Int -> Int -> [String]
+walk map player dir x y | dir == 'U' && getElement map x (y-1) == ' ' = switchElement map x (y-1) player 
+						| dir == 'D' && getElement map x (y+1) == ' ' = switchElement map x (y+1) player
+						| dir == 'L' && getElement map (x-1) y == ' ' = switchElement map (x-1) y player
+						| dir == 'R' && getElement map (x+1) y == ' ' = switchElement map (x+1) y player
+						| otherwise = map  
+-}
+----------------------------
+
+getElement :: [String] -> Int -> Int -> Char
+getElement (h:t) x y | y == 1 = getElementX h x
+					 | otherwise = getElement t x (y-1)
+
+getElementX :: String -> Int -> Char
+getElementX (h:t) 1 = h
+getElementX (h:t) x = getElementX t (x-1)
+						
+walk :: [String] -> Int -> Int -> Int -> Char -> String
+walk map player x y dir | dir == 'U' && getElement map x (y-1) == ' ' = show player ++  " " ++ show x ++ " " ++ show (y-1)
+					    | dir == 'D' && getElement map x (y+1) == ' ' = show player ++  " " ++ show x ++ " " ++ show (y+1)
+					    | dir == 'L' && getElement map (x-1) y == ' ' = show player ++  " " ++ show (x-1) ++ " " ++ show y 
+					    | dir == 'R' && getElement map (x+1) y == ' ' = show player ++  " " ++ show (x+1) ++ " " ++ show y
+
+move :: [String] -> Int -> Char -> [String]
+
+
+
+
+{-main :: IO ()
+main = do a <- getArgs
+          let p = a !! 0
+          let c = a !! 1
+          w <- getContents
+          if length a == 2 && length p == 1 && isDigit (head p) && length c == 1 && head c `elem` "UDLRB"
+             then putStr $ unlines $ move (lines w) (read p) (head c)
+             else putStrLn "Parâmetros inválidos"
+-}

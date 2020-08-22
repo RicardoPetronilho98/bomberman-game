@@ -1,0 +1,172 @@
+module Main where
+
+import AllF
+import Graphics.Gloss         
+import Graphics.Gloss.Data.Picture  
+import Graphics.Gloss.Interface.Pure.Game
+
+-- | Uma representação do estado do jogo.
+type Estado = (Int,([Celulas],Power_Ups,[Estado_da_Bomba],Jogadores),Figuras)
+
+data Figuras = Figuras { tijolo :: Picture, pedra :: Picture, relva :: Picture, jogador :: Picture, bomba :: Picture }
+
+-- | O estado inicial do jogo.
+estadoInicial :: IO Estado
+estadoInicial = do
+  fig1 <- loadBMP "tijolo.bmp"
+  fig2 <- loadBMP "pedra.bmp"
+  fig3 <- loadBMP "relva.bmp"
+  fig4 <- loadBMP "jogador.bmp"
+  fig5 <- loadBMP "bomba.bmp"
+  let l_figuras = Figuras fig1 fig2 fig3 fig4 fig5
+  putStrLn "Qual a Dimensão?"
+  x <- getLine
+  let size = read x :: Int 
+  putStrLn "Qual a Seed?"
+  y <- getLine
+  let seed = read y :: Int
+  return (size,(concat $ converte_mapa $ justMap $ mapa size seed,[],[],[J 0 (1,1) "",J 1 (size-2,1) "",J 2 (1,size-2) "",J 3 (size-2,size-2) ""]),l_figuras) --retrun estado
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+-- | Função que desenha o jogo.
+desenhaEstado :: Estado -> Picture
+desenhaEstado estado@(dim,(a,b,c,d),figuras) = Pictures $ aux_desenha_estado dim k k (-k) 0 (aux_put_J estado (aux_get_figuras (a,figuras)))
+       where k = fromIntegral (div dim 2)
+
+
+aux_get_figuras :: ([Celulas],Figuras) -> [Picture]
+aux_get_figuras ([],_) = []
+aux_get_figuras ((x:xs),figuras) | x == Pedra = pedra figuras : aux_get_figuras (xs,figuras)
+                                 | x == Vazio = relva figuras : aux_get_figuras (xs,figuras)
+                                 | x == Tijolo = tijolo figuras : aux_get_figuras (xs,figuras)
+
+--d = dimensao do mapa
+--w = div DIM 2
+--k = div DIM 2
+--l coorresponde á linha "inicial" = -(div DIM 2:)
+--v começam e 0
+--60 é a unidade, pois cada imagem é de 60 por 60:
+aux_desenha_estado :: Int -> Float -> Float -> Float -> Int -> [Picture] -> [Picture]
+aux_desenha_estado _ _ _ _ _ [] = []
+aux_desenha_estado d w k l v (x:xs)
+    | v < d = Translate (-60*k) (-60*l) x : aux_desenha_estado d w (k-1) l (v+1) xs
+    | otherwise = aux_desenha_estado d w w (l+1) 0 (x:xs)
+
+
+
+--b - [PU_Bomba (5,2),PU_Bomba (3,3),PU_Flame (5,5)]
+--c - [Bomba_P (2,1,0,1,10),Bomba_P (3,5,2,1,10)]
+
+
+
+--d - [J 0 (2,3) "+!",J 1 (3,5) "!",J 2 (1,6) "+"])
+
+
+aux_put_J :: Estado -> [Picture] -> [Picture]
+aux_put_J (dim,(a,b,c,(x:xs)),figuras) mapa_fig = aux_F (dim,(a,b,c,xs),figuras) (aux_put (jogador figuras) (jogador_coords x) mapa_fig 1 dim) 
+    where aux_F estado@(dim,(a,b,c,[]),figuras) mapa_fig = mapa_fig
+          aux_F estado mapa_fig = aux_put_J estado mapa_fig 
+
+
+
+
+
+
+
+
+
+--k começa em 0
+aux_put :: Picture -> Coordenada -> [Picture] -> Int -> Dimensao_do_Mapa -> [Picture]
+aux_put figura coord (x:xs) k dim | aux_count coord dim == k = figura : xs
+                                  | otherwise = x : aux_put figura coord xs (k+1) dim
+                                    where aux_count (c,l) dim = l * dim + c + 1 
+
+{-
+
+-- | Função que desenha o jogo.
+desenhaEstado :: Estado -> Picture
+desenhaEstado ((a,b,c,d),figuras) = Pictures $ aux_desenha_estado d k k (-k) 0 (aux_get_figuras (lista,figuras)) figuras
+       where lista = concat a
+             k = fromIntegral (div (length a) 2)
+             d = length a
+
+
+aux_get_figuras :: ([Celulas],Figuras) -> [Picture]
+aux_get_figuras ([],_) = [] 
+aux_get_figuras ((x:xs),figuras) | x == Pedra = pedra figuras : aux_get_figuras (xs,figuras)
+                                 | x == Vazio = relva figuras : aux_get_figuras (xs,figuras)
+                                 | x == Tijolo = tijolo figuras : aux_get_figuras (xs,figuras)
+--u é a lista de figuras
+--d = dimensao do mapa
+--w = div DIM 2
+--k = div DIM 2
+--l coorresponde á linha inicial = -(div DIM 2:)
+--v começam e 0
+--60 é a unidade, pois cada imagem é de 60 por 60:
+aux_desenha_estado :: Int -> Float -> Float -> Float -> Int -> [Picture] -> Figuras -> [Picture]
+aux_desenha_estado _ _ _ _ _ [] _ = []
+aux_desenha_estado d w k l v (x:xs) u 
+    | v == 1 && l == (-w+1) || v == (d-2) && l == (-w+1) || v == 1 && l == (w-1) || v == (d-2) && l == (w-1) = Translate (-60*k) (-60*l) (jogador u) : aux_desenha_estado d w (k-1) l (v+1) xs u 
+    | v < d = Translate (-60*k) (-60*l) x : aux_desenha_estado d w (k-1) l (v+1) xs u
+    | otherwise = aux_desenha_estado d w w (l+1) 0 (x:xs) u
+
+-}
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+
+-- | Função que altera o estado do jogo quando acontece um evento.
+reageEvento :: Event -> Estado -> Estado
+reageEvento e s = s
+
+
+{-
+-- | Move a bola uma coordenada para o lado.
+moveBola :: (Float,Float) -> Estado -> Estado
+moveBola (x,y) ((xMapa,yMapa),(xBola,yBola),bola,time) = ((xMapa,yMapa),(arredonda xMapa (x + xBola),arredonda yMapa (y + yBola)),bola,time)
+    where
+    -- Evita que a bola saia fora do mapa
+    -- assume que a bola é um quadrado com arestas de comprimento 20
+    arredonda limite p = max 10 (min p (limite-10))
+
+
+-- | Função que altera o estado do jogo quando acontece um evento.
+-- Reage ao pressionar das setas do teclado, movendo a bola 5 pixéis numa direção.
+reageEvento :: Event -> Estado -> Estado
+reageEvento (EventKey (SpecialKey KeyUp)    Down _ _) mapa = moveBola (0,5)  mapa
+reageEvento (EventKey (SpecialKey KeyDown)  Down _ _) mapa = moveBola (0,-5) mapa
+reageEvento (EventKey (SpecialKey KeyLeft)  Down _ _) mapa = moveBola (-5,0) mapa
+reageEvento (EventKey (SpecialKey KeyRight) Down _ _) mapa = moveBola (5,0)  mapa
+reageEvento _ mapa = mapa -- ignora qualquer outro evento
+
+-}
+
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+-- | Função que altera o estado do jogo quando o tempo avança n segundos.
+reageTempo :: Float -> Estado -> Estado
+reageTempo f s = s
+
+-- | Frame rate
+fr :: Int
+fr = 50
+
+-- | Display mode
+dm :: Display
+dm = InWindow "Novo Jogo" (800, 600) (0, 0)
+    
+-- | Função principal que invoca o jogo.
+main :: IO ()
+main = do inicio <- estadoInicial 
+          play dm              -- display mode
+               (greyN 0.5)     -- côr do fundo da janela
+               fr              -- frame rate
+               inicio          -- estado inicial
+               desenhaEstado   -- desenha o estado do jogo
+               reageEvento     -- reage a um evento
+               reageTempo      -- reage ao passar do tempo
+

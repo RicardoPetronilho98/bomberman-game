@@ -1,0 +1,241 @@
+mapa1 = ["#########","#       #","# #?# # #","#     ? #","# # # #?#","# ?     #","# #?#?# #","#  ??   #","#########","+ 5 2","+ 3 3","! 5 5","* 2 1 0 1 10","* 3 5 2 1 10","0 2 3 +!","1 3 5 !","2 1 6 +"]
+mapa2 = ([[Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra],[Pedra,Vazio,Vazio,Vazio,Vazio,Vazio,Vazio,Vazio,Pedra],[Pedra,Vazio,Pedra,Tijolo,Pedra,Vazio,Pedra,Vazio,Pedra],[Pedra,Vazio,Vazio,Vazio,Vazio,Vazio,Tijolo,Vazio,Pedra],[Pedra,Vazio,Pedra,Vazio,Pedra,Vazio,Pedra,Tijolo,Pedra],[Pedra,Vazio,Tijolo,Vazio,Vazio,Vazio,Vazio,Vazio,Pedra],[Pedra,Vazio,Pedra,Tijolo,Pedra,Tijolo,Pedra,Vazio,Pedra],[Pedra,Vazio,Vazio,Tijolo,Tijolo,Vazio,Vazio,Vazio,Pedra],[Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra]],[PU_Bomba (5,2),PU_Bomba (3,3),PU_Flame (5,5)],[Bomba (2,1,0,1,10),Bomba (3,5,2,1,10)],[Vivo 0 (2,3) "+!",Vivo 1 (3,5) "!",Vivo 2 (1,6) "+"])
+
+{-|
+module Main where
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+    
+avanca :: [String] -> Int -> [String]
+avanca = undefined
+
+main :: IO ()
+main = do
+    a <- getArgs
+    let ticks = readMaybe (a !! 0)
+    w <- getContents
+    if isJust ticks
+        then putStr $ unlines $ avanca (lines w) (fromJust ticks)
+        else putStrLn "Parâmetros inválidos"
+-}
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+--ESTRUTURAÇÃO/ SEPARAÇÃO DO MAPA:
+
+data Celulas = Pedra | Tijolo | Vazio deriving Show
+data Power_Up = PU_Bomba Coordenada | PU_Flame Coordenada deriving Show
+data Bomb = Bomba Quintuplo deriving Show
+data Jogador = Vivo Int Coordenada PUs | Morto Int deriving Show
+
+type Mapa_Original = [String]
+type Mapa = [[Celulas]]
+type Power_Ups = [Power_Up]
+type Estado_do_Power_Up = String
+type Coordenada = (Int,Int)
+type Estado_da_Bomba = Bomb
+type Quintuplo = (Int,Int,Int,Int,Int)
+type Jogadores = [Jogador]
+type PUs = String
+type Estado_de_jogo = (Mapa, Power_Ups, [Estado_da_Bomba], Jogadores)
+type Raio_da_bomba = Int
+type Lista_de_Coordenadas = [(Int,Int)]
+
+converte_mapa :: Mapa_Original -> Mapa
+converte_mapa [] = []
+converte_mapa (h:t) = [aux_converte h] ++ converte_mapa t where
+  aux_converte [] = []
+  aux_converte (x:xs) | x == ' ' = Vazio : aux_converte xs
+                      | x == '?' = Tijolo : aux_converte xs
+                      | x == '#' = Pedra : aux_converte xs
+
+converte_Power_Ups :: [String] -> Power_Ups
+converte_Power_Ups [] = []
+converte_Power_Ups (x:xs) | head x == '+' = [PU_Bomba (aux (words x))] ++ converte_Power_Ups xs
+                          | head x == '!' = [PU_Flame (aux (words x))] ++ converte_Power_Ups xs where
+  aux [a,b,c] = (read b :: Int, read c :: Int)
+
+converte_Bombas :: [String] -> [Estado_da_Bomba]
+converte_Bombas [] = []
+converte_Bombas (x:xs) = [Bomba (aux (drop 1 (words x)))] ++ converte_Bombas xs where
+  aux [a,b,c,d,e] = (read a,read b,read c,read d,read e)
+
+converte_jogadores :: [String] -> Jogadores
+converte_jogadores [] = []
+converte_jogadores (x:xs) = [aux (words x)]  ++ converte_jogadores xs where
+  aux [a,b,c,d] = Vivo (read a) (read b,read c) d 
+
+------------------------------------------------------------------------------------------------------------------------------------
+estado_de_jogo :: Mapa_Original -> Estado_de_jogo
+estado_de_jogo l = (converte_mapa a, converte_Power_Ups b, converte_Bombas c, converte_jogadores d) where
+  a = justMap l
+  b = estado_dos_power_Ups l
+  c = estado_de_todas_as_bombas l
+  d = estado_dos_jogadores l
+------------------------------------------------------------------------------------------------------------------------------------
+
+justMap :: [String] -> [String]
+justMap (h:t) | head h == '#' = [h] ++ justMap t
+              | otherwise = []  
+
+--recebe o mapa e indica os Power_Ups:
+estado_dos_power_Ups :: [String] -> [String]
+estado_dos_power_Ups mapa = aux_1 mapa where
+  aux_1 [] = []
+  aux_1 (h:t) | [head h] == "+" || [head h] == "!" = [h] ++ aux_1 t
+              | otherwise = aux_1 t
+
+--recebe o mapa e indica os estados de bomba de todas as bombas plantadas no mapa:
+estado_de_todas_as_bombas :: [String] -> [String]
+estado_de_todas_as_bombas mapa = aux_1 mapa where
+  aux_1 [] = []
+  aux_1 (h:t) | [head h] == "*" = [h] ++ aux_1 t
+              | otherwise = aux_1 t 
+--ex: recebe o mapa1 = ["* 2 1 0 1 10","* 3 5 2 1 10"] 
+
+estado_dos_jogadores :: [String] -> [String]
+estado_dos_jogadores mapa = aux_1 mapa where
+  aux_1 [] = []
+  aux_1 (h:t) | [head h] == "0" || [head h] == "1" || [head h] == "2" || [head h] == "3" = [h] ++ aux_1 t
+              | otherwise = aux_1 t
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+{-| 
+
+--O efeito principal da passagem do tempo é a explosão das bombas e a possível morte de jogadores em consequência 
+--dessa explosão. 
+--Cada bomba demora 10 instantes de tempo a explodir. 
+        
+
+        --QUASE!!!!
+        --As chamas eliminam todos os jogadores e power ups (já destapados) que atingem. 
+        --As linhas referentes a jogadores e power ups eliminados devem ser removidas da representação do jogo. 
+        
+        
+        --CHECKED! Se as chamas atingirem outra bomba o temporizador dessa bomba passa para 1, de forma a forçar a sua explosão no próximo instante de tempo. 
+        --CHECKED! As chamas não destroem os blocos do tipo pedra, sendo a sua passagem bloqueada pelos mesmos. 
+        --CHECKED! Tal como a pedra, o tijolo e os power ups também bloqueiam a passagem das chamas
+        --CHECKED! Uma bomba tem um determinado raio de acção, determinado pelo número de power ups Flame que o jogador que a colocou possuía. 
+        --CHECKED! Quando explode lança chamas com dimensão igual ao raio nas quatro direções principais (norte, sul, leste e oeste). 
+       
+
+
+        --Quando atingem um bloco do tipo tijolo, destroem o mesmo revelando possíveis power ups que estejam escondidos atrás. 
+
+
+--Cada jogo tem uma duração fixa. 
+--Para forçar os jogadores a efectuar acções, num mapa de dimensão  n , 
+--quando faltarem  (n-2)^2  instantes de tempo o mapa começa a fechar-se com blocos de pedra num efeito de espiral 
+--que começa na posição 1 1. 
+--Este efeito pode, por exemplo, ser visto no vídeo https://www.youtube.com/watch?v=l9-wQfkJCNM  
+--(começando sensivelmente no instante 1:57). 
+--Em cada instante de tempo cai um bloco de pedra que elimina tudo o que estiver na respectiva posição.
+-}
+
+
+--determina o raio de uma bomba:
+bomba_raio :: Estado_da_Bomba -> Raio_da_bomba
+bomba_raio (Bomba (a,b,c,d,e)) = d
+--ex: Bomba (3,5,2,1,10) = 1 
+
+--determina as coordenadas de uma bomba (a sua localização no mapa):
+bomba_coords :: Estado_da_Bomba -> Coordenada
+bomba_coords (Bomba (a,b,c,d,e)) = (a,b)  
+--ex: Bomba (3,5,2,1,10) = (3,5)
+
+{-|
+
+--determina as coordenadas das chamas na esplosão da bomba consoante o mapa dado (se a chama atingir um '#' é bloqueada, se atingir um '?' faz esplodir esse elemento mas depois é bloqueada, noutro caso qualquer esplode esse elemento):
+raio_acao_bomba :: Mapa -> Estado_da_Bomba -> Lista_de_Coordenadas -> Raio_Coordenadas
+raio_acao_bomba mapa e p_u = (retirar (bomba_coords e) (cima mapa (bomba_coords e) (bomba_raio e) p_u ++ baixo mapa (bomba_coords e) (bomba_raio e) p_u ++ direita mapa (bomba_coords e) (bomba_raio e) p_u ++ esquerda mapa (bomba_coords e) (bomba_raio e) p_u)) ++ [bomba_coords e] where 
+    cima _ _ (-1) _ = []
+    cima mapa (c,l) n p_u | qual_o_caracter mapa (c,l) == '#' = []
+                          | qual_o_caracter mapa (c,l) == '?' = [(c,l)]
+                          | (c,l) `elem` p_u = [(c,l)]
+                          | otherwise = [(c,l)] ++ cima mapa (c,l-1) (n-1) p_u
+    baixo _ _ (-1) _ = []
+    baixo mapa (c,l) n p_u | qual_o_caracter mapa (c,l) == '#' = []
+                           | qual_o_caracter mapa (c,l) == '?' = [(c,l)]
+                           | (c,l) `elem` p_u = [(c,l)]
+                           | otherwise = [(c,l)] ++ baixo mapa (c,l+1) (n-1) p_u
+    direita _ _ (-1) _ = []
+    direita mapa (c,l) n p_u | qual_o_caracter mapa (c,l) == '#' = []
+                             | qual_o_caracter mapa (c,l) == '?' = [(c,l)]
+                             | (c,l) `elem` p_u = [(c,l)]
+                             | otherwise = [(c,l)] ++ direita mapa (c+1,l) (n-1) p_u
+    esquerda _ _ (-1) _ = []
+    esquerda mapa (c,l) n p_u | qual_o_caracter mapa (c,l) == '#' = []
+                              | qual_o_caracter mapa (c,l) == '?' = [(c,l)]
+                              | (c,l) `elem` p_u = [(c,l)]
+                              | otherwise = [(c,l)] ++ esquerda mapa (c-1,l) (n-1) p_u   
+
+--raio_acao_bomba mapa1 "* 3 5 2 2 10" (converter_P_Ups_em_Coords (estado_dos_power_Ups mapa1)) = [(3,4),(3,3),(3,6),(4,5),(5,5),(2,5),(3,5)]
+
+-}
+
+
+--recebe o estado de todos os Power Ups no mapa e indica as suas coordenadas numa lista:
+converter_P_Ups_em_Coords :: Power_Ups -> Lista_de_Coordenadas
+converter_P_Ups_em_Coords [] = []
+converter_P_Ups_em_Coords (x:xs) = [aux x] ++ converter_P_Ups_em_Coords xs where
+  aux (PU_Bomba c) = c
+  aux (PU_Flame c) = c
+
+--[PU_Bomba (5,2),PU_Bomba (3,3),PU_Flame (5,5)] = [(5,2),(3,3),(5,5)]
+
+
+
+
+{-|
+
+
+
+
+--testa se o estado de bomba em causa está dentro do raio de esplosão de outra bomba, em caso afirmativo reduz o temporizador dessa bomba passa para 1, de forma a forçar a sua explosão no próximo instante de tempo.
+--em caso negativo retorna o mesmo estado de bomba:  
+esplode_agora :: Estado_da_Bomba -> Raio_Coordenadas -> Estado_da_Bomba
+esplode_agora b r_lista | bomba_coords b `elem` r_lista = unwords (take 5 (words b) ++ ["1"])  
+                        | otherwise = b
+
+
+
+
+
+
+
+destapa_tijolo :: Mapa -> Raio_Coordenadas -> Mapa
+destapa_tijolo mapa (y:ys) = undefined
+
+
+
+
+
+
+
+
+
+elemina_jogador :: Mapa -> Estado_de_Jogador -> Raio_Coordenadas -> Mapa
+elemina_jogador mapa e_j r_coords | jogador_coords e_j `elem` r_coords = retirar e_j mapa
+                                  | otherwise = mapa 
+
+elimina_Power_Ups :: Mapa -> Estado_do_Power_Up -> Raio_Coordenadas -> Mapa 
+elimina_Power_Ups mapa e_PU r_coords | pu_coords e_PU `elem` r_coords = retirar e_PU mapa
+                                     | otherwise = mapa 
+
+----------------------------------------------------------------------------------------------------------------------------------
+--Funções auxiliares usadas ao longo de todo a Tarefa:
+
+
+
+--função auxiliar que retira um elemento a uma lista:
+retirar :: Eq a => a -> [a] -> [a]
+retirar a [] = []
+retirar a (x:xs) = if a == x then retirar a xs else x : retirar a xs
+
+
+
+-}
+
+

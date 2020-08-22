@@ -1,0 +1,125 @@
+module Main where
+
+import AllF
+import Graphics.Gloss         
+import Graphics.Gloss.Data.Picture  
+import Graphics.Gloss.Interface.Pure.Game
+
+-- | Uma representação do estado do jogo.
+type Estado = (Dimensao_do_mapa,([Celulas],Power_Ups,[Estado_da_Bomba],Jogadores),Figuras)
+
+type Coluna = Float
+type Linha = Float
+type Dimensao_do_mapa = Int
+
+data Figuras = Figuras { tijolo :: Picture, pedra :: Picture, relva :: Picture, jogador :: Picture, bomba :: Picture, pubomba :: Picture, puflame :: Picture }
+
+-- | O estado inicial do jogo.
+estadoInicial :: IO Estado
+estadoInicial = do
+  fig1 <- loadBMP "tijolo.bmp"
+  fig2 <- loadBMP "pedra.bmp"
+  fig3 <- loadBMP "relva.bmp"
+  fig4 <- loadBMP "jogador.bmp"
+  fig5 <- loadBMP "bomba.bmp"
+  fig6 <- loadBMP "pubomba.bmp"
+  fig7 <- loadBMP "puflame.bmp"
+  let l_figuras = Figuras fig1 fig2 fig3 fig4 fig5 fig6 fig7
+  putStrLn "Qual a Dimensão?"
+  x <- getLine
+  let size = read x :: Int 
+  putStrLn "Qual a Seed?"
+  y <- getLine
+  let seed = read y :: Int
+  return (size,(concat $ converte_mapa $ justMap $ mapa size seed,[],[],[J 0 (1,1) "",J 1 (size-2,1) "",J 2 (1,size-2) "",J 3 (size-2,size-2) ""]),l_figuras) --retrun estado
+
+--return (size,(concat $ converte_mapa $ justMap $ mapa size seed,[PU_Bomba (5,2),PU_Bomba (3,3),PU_Flame (5,5)],[Bomba_P (2,1,0,1,10),Bomba_P (3,5,2,1,10)],[J 0 (1,1) "",J 1 (size-2,1) "",J 2 (1,size-2) "",J 3 (size-2,size-2) ""]),l_figuras)
+--return (size,(concat $ converte_mapa $ justMap $ mapa size seed,[],[],[J 0 (1,1) "",J 1 (size-2,1) "",J 2 (1,size-2) "",J 3 (size-2,size-2) ""]),l_figuras) --retrun estado
+--return (size,([Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Vazio,Vazio,Vazio,Vazio,Vazio,Vazio,Vazio,Pedra,Pedra,Vazio,Pedra,Tijolo,Pedra,Vazio,Pedra,Vazio,Pedra,Pedra,Vazio,Vazio,Vazio,Vazio,Vazio,Tijolo,Vazio,Pedra,Pedra,Vazio,Pedra,Vazio,Pedra,Vazio,Pedra,Tijolo,Pedra,Pedra,Vazio,Tijolo,Vazio,Vazio,Vazio,Vazio,Vazio,Pedra,Pedra,Vazio,Pedra,Tijolo,Pedra,Tijolo,Pedra,Vazio,Pedra,Pedra,Vazio,Vazio,Tijolo,Tijolo,Vazio,Vazio,Vazio,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra,Pedra],[PU_Bomba (5,2),PU_Bomba (3,3),PU_Flame (5,5)],[Bomba_P (2,1,0,1,10),Bomba_P (3,5,2,1,10)],[J 0 (2,3) "+!",J 1 (3,5) "!",J 2 (1,6) "+"]),l_figuras)
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+-- | Função que desenha o jogo.
+desenhaEstado :: Estado -> Picture
+desenhaEstado estado@(dim,(a,b,c,d),figuras) = Translate (-k) k $ Pictures $ junta_tudo estado where k = 60 * (fromIntegral (div dim 2))
+
+--função que organiza a ordem de cada figura no mapa (Pedra,Pedra,etc) consoante o estado de jogo:
+aux_get_figuras :: ([Celulas],Figuras) -> [Picture]
+aux_get_figuras ([],_) = []
+aux_get_figuras ((x:xs),figuras) | x == Pedra = pedra figuras : aux_get_figuras (xs,figuras)
+                                 | x == Vazio = relva figuras : aux_get_figuras (xs,figuras)
+                                 | x == Tijolo = tijolo figuras : aux_get_figuras (xs,figuras)
+
+--função que desenha apenas o tabuleiro do mapa com Pedra, Tijolo e Vazio (faltam os jogadores, Power Ups e bombas plantadas:
+desenha_mapa :: Dimensao_do_mapa -> Coordenada -> [Picture] -> [Picture] 
+desenha_mapa _ _ [] = []
+desenha_mapa dim (c,l) (x:xs) | c == dim = desenha_mapa dim (0,(l+1)) (x:xs)
+                              | otherwise = desenha_coord (c,l) x : desenha_mapa dim ((c+1),l) xs
+
+--função que coloca a figura na sua coordenada correta no referencial:
+desenha_coord :: Coordenada -> Picture -> Picture
+desenha_coord (c,l) figura = Translate (60*(fromIntegral c)) (-60*(fromIntegral l)) figura 
+
+aux_put_J :: Estado -> [Picture]
+aux_put_J (_,(_,_,_,[]),_) = []
+aux_put_J (dim,(a,b,c,(x:xs)),figuras) = [desenha_coord (jogador_coords x) (jogador figuras)] ++ aux_put_J (dim,(a,b,c,xs),figuras)
+
+aux_put_B :: Estado -> [Picture]
+aux_put_B (_,(_,_,[],_),_) = []
+aux_put_B (dim,(a,b,(x:xs),d),figuras) = [desenha_coord (bomba_coords x) (bomba figuras)] ++ aux_put_B (dim,(a,b,xs,d),figuras) 
+
+
+aux_put_PU :: Estado -> [Picture]
+aux_put_PU (_,(_,[],_,_),_) = []
+aux_put_PU (dim,(a,(x:xs),c,d),figuras) 
+   | is_it_PU_Flame x && is_it_vazio a (pu_coords x) = [desenha_coord (pu_coords x) (puflame figuras)] ++ aux_put_PU (dim,(a,xs,c,d),figuras)
+   | is_it_PU_Flame x == False && is_it_vazio a (pu_coords x) = [desenha_coord (pu_coords x) (pubomba figuras)] ++ aux_put_PU (dim,(a,xs,c,d),figuras)
+   | otherwise = [desenha_coord (pu_coords x) (tijolo figuras)] ++ aux_put_PU (dim,(a,xs,c,d),figuras)
+      where is_it_PU_Flame (PU_Flame _) = True 
+            is_it_PU_Flame (PU_Bomba _) = False
+            is_it_vazio mapa coord | (!!) mapa ((aux_count coord dim)-1) == Vazio = True
+                                   | otherwise = False
+            aux_count (c,l) dim = l * dim + c + 1
+
+junta_tudo :: Estado -> [Picture]
+junta_tudo estado@(dim,(a,b,c,d),figuras) = desenha_mapa dim (0,0) (aux_get_figuras (a,figuras)) ++ aux_put_B estado ++ aux_put_PU estado ++ aux_put_J estado
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+
+-- | Função que altera o estado do jogo quando acontece um evento.
+reageEvento :: Event -> Estado -> Estado
+reageEvento e s = s
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+-- | Função que altera o estado do jogo quando o tempo avança n segundos.
+reageTempo :: Float -> Estado -> Estado
+reageTempo f s = s
+
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+
+-- | Frame rate
+fr :: Int
+fr = 50
+
+-- | Display mode
+dm :: Display
+dm = InWindow "Novo Jogo" (800, 600) (0, 0)
+    
+-- | Função principal que invoca o jogo.
+main :: IO ()
+main = do inicio <- estadoInicial 
+          play dm              -- display mode
+               (greyN 0.5)     -- côr do fundo da janela
+               fr              -- frame rate
+               inicio          -- estado inicial
+               desenhaEstado   -- desenha o estado do jogo
+               reageEvento     -- reage a um evento
+               reageTempo      -- reage ao passar do tempo
+

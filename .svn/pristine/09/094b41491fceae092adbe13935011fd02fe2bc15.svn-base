@@ -1,0 +1,148 @@
+module Main where
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+import Tarefa6_li1g145 (bot)
+
+main :: IO ()
+main = do
+    a <- getArgs
+    let player = readMaybe (a !! 0)
+    let ticks = readMaybe (a !! 1)
+    w <- getContents
+    if isJust player && isJust ticks
+        then putStr $ show $ bot (lines w) (fromJust player) (fromJust ticks)
+        else putStrLn "Parâmetros inválidos"
+
+data Celulas = Pedra | Tijolo | Vazio deriving (Show,Eq)
+data Power_Up = PU_Bomba Coordenada | PU_Flame Coordenada deriving (Show,Eq)
+data Estado_da_Bomba = Bomba_P Quintuplo deriving (Show,Eq)
+data Jogador = J Int Coordenada PUs deriving (Show,Eq)
+--data Dir = 
+
+type Estado_de_jogo_T6 = (Mapa, [Estado_da_Bomba], Jogadores) --estado de jogo em (Datas) que o bot vai receber
+type Numero_jogador = Int
+type Tempo = Int
+type Dimensao_do_Mapa = Int
+type Numero_blocos_meio = Int
+type Mapa_Original = [String]
+type Mapa = [[Celulas]]
+type Power_Ups = [Power_Up]
+type Estado_do_Power_Up = String
+type Coordenada = (Int,Int)
+type Quintuplo = (Int,Int,Int,Int,Int)
+type Jogadores = [Jogador]
+type PUs = String
+type Estado_de_jogo = (Mapa, Power_Ups, [Estado_da_Bomba], Jogadores)
+type Raio_da_bomba = Int
+type Lista_de_Coordenadas = [(Int,Int)]
+type Raio_Coordenadas = [(Int,Int)]
+type Mapa_Auxiliar = [[Int]]  
+type Action = Char
+type Bomba_Dist = (Char, Int)
+type Jogada = (Action, Int)
+type Jogadas = [Jogada]
+
+
+--Dado o estado de jogo, devolve a jogada que deve ser efetuada pelo bot (defensiva)
+evade :: Estado_de_jogo_T6 -> Numero_jogador -> Action
+evade (mapa, bombas, jogadores) n = firstValid mapa (findPlayer jogadores n) (dirBySafety (mapa, bombas, jogadores) (findPlayerCoords jogadores n))
+
+coord_do_bot :: Estado_de_jogo_T6 -> Numero_jogador -> Coordenada
+coord_do_bot (a,b,((J n coord _ ):xs)) x 
+    | n == x = coord 
+    | otherwise = coord_do_bot (a,b,xs) x
+
+--Vem da T4
+qual_o_caracter :: Mapa -> Coordenada -> Celulas 
+qual_o_caracter mapa (c,l) = l_aux mapa (c,l) 0 where 
+    l_aux (x:xs) (c,l) l1 | l == l1 = c_aux x c 0
+                          | otherwise = l_aux xs (c,l) (l1+1) 
+    c_aux (x:xs) c c1 | c == c1 = x 
+                      | otherwise = c_aux xs c (c1+1)
+
+
+--Verifica se uma acção é válida no mapa
+isValid :: Mapa -> Jogador -> Action -> Bool
+isValid map (J _ (x,y) pu ) c | c == 'U' && ((qual_o_caracter map (x, y - 1)) == Vazio) = True
+							  | c == 'D' && ((qual_o_caracter map (x, y + 1)) == Vazio) = True
+					   		  | c == 'L' && ((qual_o_caracter map (x - 1, y)) == Vazio) = True
+							  | c == 'R' && ((qual_o_caracter map (x + 1, y)) == Vazio) = True
+							  | c == 'B' && (length pu /= 0) = True
+							  | otherwise = False
+
+--Dado o número de um jogador, devolve o Jogador correspondente
+findPlayer :: Jogadores -> Numero_jogador -> Jogador
+findPlayer ((J j coords pus):js) n | j == n = (J j coords pus)
+								   | otherwise = findPlayer js n
+
+--Dado o número de um jogador, devolve as coordenadas do Jogador correspondente
+findPlayerCoords :: Jogadores -> Numero_jogador -> Coordenada
+findPlayerCoords jogadores n = let (J j coords pus) = findPlayer jogadores n
+							   in coords
+
+--Dada a lista de direções e o nivel de perigo de cada, organizada por ordem crescente de perigo, seleciona a primeira jogada válida
+firstValid :: Mapa -> Jogador -> Jogadas -> Action
+firstValid _ _ [] = 'B'
+firstValid mapa player (h:ts) = let action = fst h
+						        in if (isValid mapa player action) == True then action
+						    	   else firstValid mapa player ts
+
+-- Funções que organizam uma lista de jogadas de forma crescente de perigo (decrescente de segurança)
+decrescent :: Jogadas -> Jogadas
+decrescent [x] = [x]
+decrescent list = (decrescentAux1 list : decrescent (decrescentAux2 list)) 
+
+decrescentAux2 :: Jogadas -> Jogadas
+decrescentAux2 [x] = []
+decrescentAux2 (h:s:ts) | (snd h) > (snd s) = s : (decrescentAux2 (h:ts))
+					    | otherwise = h : (decrescentAux2 (s:ts))
+
+decrescentAux1 :: Jogadas -> Jogada
+decrescentAux1 [x] = x
+decrescentAux1 (h:s:ts) | (snd h) > (snd s) = decrescentAux1 (h:ts)
+					    | otherwise = decrescentAux1 (s:ts)
+
+---------
+
+--Dado o estado de jogo e a posição de um jogador, devolve a lista de niveis de perigo das 4 direçoes
+dirBySafety :: Estado_de_jogo_T6 -> Coordenada -> Jogadas
+dirBySafety (map,bombs,_) (xp, yp) = decrescent [('L',minSafetyLevel (xp-1, yp) bombs),('U',minSafetyLevel (xp, yp-1) bombs),('R',minSafetyLevel (xp+1, yp) bombs),('D',minSafetyLevel (xp, yp+1) bombs)] 
+
+--Funções que calculam o perigo associado a uma coordenada do mapa, usando como factores o tempo que falta para as bombas explodirem
+--e se estão no alcance da próxima jogada
+minSafetyLevel :: Coordenada -> [Estado_da_Bomba] -> Int
+minSafetyLevel coord bombs = minimum (safetyAux coord bombs) where
+	safetyAux _ [] = []
+	safetyAux x (h:ts) = safetyLevel x h : safetyAux x ts
+
+safetyLevel :: Coordenada -> Estado_da_Bomba -> Int
+safetyLevel pcoords (Bomba_P (xb,yb,pl,range,time)) | withinRange pcoords (Bomba_P(xb,yb,pl,range,time)) = time - 1
+												    | otherwise = 10
+
+withinRange :: Coordenada -> Estado_da_Bomba -> Bool
+withinRange (xp, yp) (Bomba_P (xb,yb,_,range,_)) | (xp == xb && yb+range > yp && yb-range < yp) || (yp == yb && xb+range > xp && xb-range < xp) = True
+											     | otherwise = False
+
+-----------
+
+
+{-
+
+--listBombDists :: Estado_de_jogo_T6 -> Int -> [Coordenada]
+--listBombDists (_,[],_) _ = []
+--listBombDists (_,_,[]) _ = []
+--listBombDists (map,(Bomba_P q):bs,(J j coords pu):js) n | n == j = (getBombDistance coords q) : listBombDists (map,bs,(J j coords pu):js) n									      
+--										                  | otherwise = listBombDists (map,(Bomba_P q):bs,js) n
+
+--getBombDistance :: Coordenada -> Quintuplo -> Coordenada
+--getBombDistance (xp,yp) (xb,yb,_,_,_) = (xb - xp, yb - xb) 
+
+--dist_J_Bomba :: Jogador -> Estado_da_Bomba -> Float
+--dist_J_Bomba (J _ (cj,lj) _) (Bomba_P (cb,lb,_,_,_)) = sqrt (fromIntegral((cj - cb)^2 + (lj - lb)^2))
+
+--afasta_bomba :: Jogador -> Estado_de_jogo_T6 -> True
+--afasta_bomba (J _ (cj,lj) _) ((Bomba_P (cb,lb,_,raio,_)):xs) | cj == cb && lj /= lb =  
+	-}

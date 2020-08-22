@@ -1,0 +1,28 @@
+module Main where
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+import Tarefa6_li1g145 (bot)
+
+main :: IO ()
+main = do
+    a <- getArgs
+    let player = readMaybe (a !! 0)
+    let ticks = readMaybe (a !! 1)
+    w <- getContents
+    if isJust player && isJust ticks
+        then putStr $ show $ bot (lines w) (fromJust player) (fromJust ticks)
+        else putStrLn "Parâmetros inválidos"
+
+coord_do_bot :: Estado_de_jogo_T6 -> Numero_jogador -> Coordenada
+coord_do_bot (a,b,((J n coord _ ):xs)) x 
+    | n == x = coord 
+    | otherwise = coord_do_bot (a,b,xs) x
+
+dist_J_Bomba :: Jogador -> Estado_da_Bomba -> Float
+dist_J_Bomba (J _ (cj,lj) _) (Bomba_P (cb,lb,_,_,_)) = sqrt (fromIntegral((cj - cb)^2 + (lj - lb)^2))
+
+afasta_bomba :: Jogador -> Estado_de_jogo_T6 -> True
+afasta_bomba (J _ (cj,lj) _) ((Bomba_P (cb,lb,_,raio,_)):xs) | cj == cb && lj /= lb =   

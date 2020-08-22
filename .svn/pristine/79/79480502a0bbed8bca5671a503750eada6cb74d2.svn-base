@@ -1,0 +1,75 @@
+import Data.Char (isDigit)
+import System.Environment
+import Solucoes.Solucao1
+type Ponto = (Int,Int)
+
+--main :: IO ()
+--main = do a <- getArgs
+ --         let p = a !! 0
+  --        let c = a !! 1
+   --       w <- getContents
+    --      if length a == 2 && length p == 1 && isDigit (head p) && length c == 1 && head c `elem` "UDLRB"
+     --        then putStr $ unlines $ move (lines w) (read p) (head c)
+      --       else putStrLn "Parâmetros inválidos"
+
+--função axuliar que apenas retorna a lisat de Strings referente ao mapa:
+justMap :: [String] -> Int -> [String]
+justMap mapa_anterior size = take size mapa_anterior
+
+--função que recebe coordenadas e o mapa e indica se é possivel mover para esse espaço:
+can_i_move :: [String] -> Ponto -> Bool
+can_i_move mapa (c,l) = if l_aux mapa (c,l) 0 == ' ' then True else False where
+  l_aux (x:xs) (c,l) l1 | l == l1 = c_aux x c 0
+                        | otherwise = l_aux xs (c,l) (l1+1) where
+                            c_aux (x:xs) c c1 | c == c1 = x 
+                                              | otherwise = c_aux xs c (c1+1) 
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+bomb_state :: Ponto -> Int -> Int -> Int -> String
+bomb_state _ _ _ 11 = []  
+bomb_state (c,l) player raio time = "* " ++ show c ++ " " ++ show l ++ " " ++ show player ++ " " ++ show raio ++ " " ++ show time   
+
+player_state :: Int -> Ponto -> String 
+player_state player (c,l) = show player ++ " " ++ show c ++ " " ++ show l
+
+
+--função que quando o player captura um power up, as coordenadas desse power up são retiradas do estado do jogo:
+new_Coordinates :: [String] -> Ponto -> Int -> [String]
+new_Coordinates estado_de_jogo (c,l) size | elem ("+ " ++ show c ++ " " ++ show l) (drop size estado_de_jogo) = retirar ("+ " ++ show c ++ " " ++ show l) (drop size estado_de_jogo)
+                                          | elem ("! " ++ show c ++ " " ++ show l) (drop size estado_de_jogo) = retirar ("! " ++ show c ++ " " ++ show l) (drop size estado_de_jogo)
+                                          | otherwise = drop size estado_de_jogo
+                                          where retirar a [] = []
+                                                retirar a (x:xs) = if a == x then retirar a xs else x : retirar a xs
+
+--ex: new_Coordinates (mapa 9 0) (5,5) 9 = ["+ 5 2","+ 3 3"]
+
+
+--coord_PUs são as coordenadas do game_state atual,  
+game_state :: [String] -> Int -> Ponto -> Int -> Int -> Int -> [String]
+game_state mapa_anterior player (c,l) size raio time = justMap mapa_anterior size ++ new_Coordinates mapa_anterior (c,l) size ++ [bomb_state (c,l) player raio time] ++ [player_state player (c,l)]
+
+--ex: game_state (mapa 9 0) 1 (5,5) 9 1 10
+
+{-
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+--função que de acordo com um "move" indica o novo estado de jogo:
+walk :: [Int] -> [String] -> Char -> Char -> Ponto -> [String]
+walk [] _ _ _ = [] --dir ssignifica direção
+walk mapa_anterior player dir (c,l) | dir == 'U' && can_i_move mapa_state (c,l-1) = game_state mapa_anterior player (c,l-1)
+                                    | dir == 'D' && can_i_move mapa_state (c,l+1) = game_state mapa_anterior player (c,l+1)
+                                    | dir == 'L' && can_i_move mapa_state (c-1,l) = game_state mapa_anterior player (c-1,l) 
+                                    | dir == 'R' && can_i_move mapa_state (c+1,l) = game_state mapa_anterior player (c+1,l) 
+                                    | dir == 'B'= game_state (c,l) player
+                                    | otherwise = game_state 
+
+--se as coordenadas do jogador forem iguais ás coordenadas dos power ups entao o jogador acumula um power up
+
+                    
+
+--o map vai ser (mapa size seed) 
+--new_Position ::
+--new_Position map x (y-1) player 
+
+-}
+
+
+--move :: [String] -> Int -> Char -> [String]

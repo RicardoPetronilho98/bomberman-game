@@ -1,0 +1,91 @@
+import System.Random
+import System.Environment
+import Text.Read
+import Data.Maybe
+
+main :: IO ()
+main = do a <- getArgs
+          let s = readMaybe (a !! 0)
+          let l = readMaybe (a !! 1)
+          if length a == 2 && isJust s && isJust l && fromJust s >= 5 && odd (fromJust s)
+             then putStr $ unlines $ mapa (fromJust s) (fromJust l)
+             else putStrLn "Parâmetros inválidos"
+ 
+--calcular o número de calhaus e espaços que vão ser preenchidos aleatóriamente ((n - 2)² - 12 - (nº de calhaus))
+nBoulders :: Int -> Int
+nBoulders n = (nlevel n) * (nlevel n) where 
+	nlevel 5 = 1
+	nlevel x = 1 + nlevel (x - 2)
+
+nRandomBlocks :: Int -> Int
+nRandomBlocks x = (x-2)^2 - 12 - nBoulders x
+
+-------
+
+--gerar uma lista aleatória de números correspondentes a tijolos, PUps e espaços vazios	
+randomize :: Int -> Int -> [Int]
+randomize size seed = take (nRandomBlocks size) $ randomRs (0,99) (mkStdGen seed)
+
+--Correspondência entre números de 0 a 99 e o seu conteúdo(tijolos, bombs, flames)
+--Os números que não figuram nestas funções vão ser espaços vazios
+cmpBetween :: Int -> (Int, Int) -> Bool
+cmpBetween x (a, b) | a > b = False
+				    | x == a = True
+				    | otherwise = cmpBetween x (a+1, b) 
+
+isBomb :: Int -> Bool
+isBomb x = cmpBetween x (0, 1)
+
+isFlames :: Int -> Bool
+isFlames x = cmpBetween x (2, 3)
+
+isBrick :: Int -> Bool
+isBrick x = cmpBetween x (4, 39)
+-----
+
+--Imprime o mapa numa String. recebe como argumento o tamanho do mapa (3x) e a lista de números (calculada com o randomize)
+-- que vai conter os PUps e tijolos. Quando acaba de  percorrer todos os elementos da lista, continua acudindo à auxiliar.
+drawMap :: Int -> Int -> Int -> [Int] -> String
+drawMap 0 _ _ _ = []
+drawMap line size x [] = drawMap2 line size x 
+drawMap line size x (h:t) | x == 1 = '#' : drawMap (line-1) size size (h:t)
+						  | line == 1 || line == size || x == size || (mod line 2 == 1 && mod x 2 == 1) = '#' : (drawMap line size (x-1) (h:t))
+						  | ((line == size-1 || line == size-2 || line == 2 || line == 3) && (x == (size-1) || x == 2)) || ((line == 2 || line == size-1) && (x == 3 || x == size-2)) = ' ' : (drawMap line size (x-1) (h:t))	
+						  | (isBomb h || isFlames h || isBrick h) = '?' : drawMap line size (x-1) t	
+						  | otherwise = ' ' : drawMap line size (x-1) t
+
+drawMap2 :: Int -> Int -> Int -> String
+drawMap2 0 _ _ = []
+drawMap2 line size x | x == 1 = '#' : drawMap2 (line-1) size size
+					 | line == 1 || line == size || x == size || (mod line 2 == 1 && mod x 2 == 1) = '#' : (drawMap2 line size (x-1))
+					 | ((line == size-1 || line == size-2 || line == 2 || line == 3) && (x == (size-1) || x == 2)) || ((line == 2 || line == size-1) && (x == 3 || x == size-2)) = ' ' : (drawMap2 line size (x-1))
+					 | otherwise = ' ' : drawMap2 line size (x-1) 
+-------
+
+--Usando a mecânica da fuñção drawMap, imprime numa lista de strings as coordenadas dos PUps (cada string é um PUp encontrado).
+findBombs :: Int -> Int -> Int -> [Int] -> [String]
+findBombs line size x [] = [] 
+findBombs line size x (h:t) | x == 1 = findBombs (line-1) size size (h:t)
+                            | line == 1 || line == size || x == size || (mod line 2 == 1 && mod x 2 == 1) = findBombs line size (x-1) (h:t)
+                            | ((line == size-1 || line == size-2 || line == 2 || line == 3) && (x == (size-1) || x == 2)) || ((line == 2 || line == size-1) && (x == 3 || x == size-2)) = findBombs line size (x-1) (h:t)	
+                            | isBomb h =  ("+ " ++ show(size - x) ++ " " ++ show(size - line)) : findBombs line size (x-1) t	
+                            | otherwise = findBombs line size (x-1) t
+  
+findFlames :: Int -> Int -> Int -> [Int] -> [String]
+findFlames line size x [] = [] 
+findFlames line size x (h:t) | x == 1 = findFlames (line-1) size size (h:t)
+                             | line == 1 || line == size || x == size || (mod line 2 == 1 && mod x 2 == 1) = findFlames line size (x-1) (h:t)
+                             | ((line == size-1 || line == size-2 || line == 2 || line == 3) && (x == (size-1) || x == 2)) || ((line == 2 || line == size-1) && (x == 3 || x == size-2)) = findFlames line size (x-1) (h:t)	
+                             | isFlames h =  ("! " ++ show(size - x) ++ " " ++ show(size - line)) : findFlames line size (x-1) t	
+                             | otherwise = findFlames line size (x-1) t
+  
+--Divide uma string numa lista de strings, cada uma com n elementos (serve para dividir o mapa por linhas)
+splitString :: Int -> String -> [String]
+splitString n [] = []
+splitString n string = take n string : splitString n (drop n string)
+
+--Juntando as funções anteriores, imprime o mapa completo com as coordenadas dos PUps
+mapa :: Int -> Int -> [String]
+mapa n s = splitString n (drawMap n n n (randomize n s)) ++ (findBombs n n n (randomize n s)) ++ (findFlames n n n (randomize n s))
+  
+

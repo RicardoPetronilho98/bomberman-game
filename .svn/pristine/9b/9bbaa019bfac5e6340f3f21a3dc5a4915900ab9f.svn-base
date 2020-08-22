@@ -1,0 +1,82 @@
+import Data.Char (isDigit)
+import System.Environment
+import Solucoes.Solucao1
+
+--main :: IO ()
+--main = do a <- getArgs
+ --         let p = a !! 0
+  --        let c = a !! 1
+   --       w <- getContents
+    --      if length a == 2 && length p == 1 && isDigit (head p) && length c == 1 && head c `elem` "UDLRB"
+     --        then putStr $ unlines $ move (lines w) (read p) (head c)
+      --       else putStrLn "Parâmetros inválidos"
+{-
+bomb_state :: Ponto -> Int -> Int -> String
+bomb_state (c,l) player raio = "* " ++ show c ++ " " ++ show l ++ " " ++ show player ++ " " ++ show raio ++ " " ++ "10"
+
+--p_ups é o resultado (String) da função power_ups:
+player_state :: Int -> Ponto -> String -> String
+player_state player (c,l) p_ups = show player ++ " " ++ show c ++ " " ++ show l ++ " " ++ p_ups
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+--ex: just_dir 'L' (4,3) 
+--number_of_PowerUps ::
+--number_of_PowerUps player (c,l) size | elem ("+ " ++ show c ++ " " ++ show l) (drop size mapa) = 
+
+--(c,l) é a coordenadas do player que está algures no esatdo de jogo dado
+move :: [String] -> Int -> Char -> [String]
+move mapa player dir | can_i_move mapa (just_dir dir (c,l)) = justMap mapa ++ new_Coordinates mapa (just_dir dir (c,l)) size ++ [player_state player (just_dir dir (c,l)) p_ups] 
+                     | dir == 'B' = mapa ++ [bomb_state (c,l) player raio] ++ [player_state player (c,l) p_ups] 
+-}
+--função que dada as coordenadas de um jogador indica as novas coordenadas dependendo da direção:
+just_dir :: Char -> Ponto -> Ponto
+just_dir dir (c,l) | dir == 'U' = (c,l-1) 
+                   | dir == 'D' = (c,l+1) 
+                   | dir == 'L' = (c-1,l) 
+                   | dir == 'R' = (c+1,l) 
+                 -- (ainda não sei se é preciso) dir == 'B' = (c,l)
+
+
+------------------------------------------------------------------------------------------------------
+--função que recebe coordenadas e o mapa e indica se é possivel mover para esse espaço:
+can_i_move :: [String] -> Ponto -> Bool
+can_i_move mapa (c,l) = if l_aux mapa (c,l) 0 == ' ' then True else False where
+  l_aux (x:xs) (c,l) l1 | l == l1 = c_aux x c 0
+                        | otherwise = l_aux xs (c,l) (l1+1) 
+  c_aux (x:xs) c c1 | c == c1 = x 
+                    | otherwise = c_aux xs c (c1+1)
+
+justMap :: [String] -> [String]
+justMap (h:t) | head h == '#' = [h] ++ justMap t
+              | otherwise = []  
+
+get_me_Coordinates :: [String] -> [String]
+get_me_Coordinates mapa = aux_coord mapa where
+  aux_coord [] = []
+  aux_coord (h:t) | [head h] == "+" || [head h] == "!" = [h] ++ aux_coord t
+                  | otherwise = aux_coord t 
+--ex: get_Coordinates (mapa 9 0) = ["+ 5 2","+ 3 3","! 5 5"] 
+
+get_me_tuples :: [String] -> [Ponto]
+get_me_tuples [] = []
+get_me_tuples ([a,b,c,d,e]:t) = (read [c] :: Int,read [e] :: Int) : get_me_tuples t
+--ex: get_me_tuples (get_Coordinates (mapa 9 0)) = [(5,2),(3,3),(5,5)]
+
+new_Coordinates :: [String] -> Ponto -> [Ponto] -> [String]
+new_Coordinates mapa (c,l) h | elem (c,l) h = retirar ("+ " ++ show c ++ " " ++ show l) mapa 
+                             | elem (c,l) h = retirar ("! " ++ show c ++ " " ++ show l) mapa
+--ex: ew_Coordinates (mapa 9 0) (3,3) [(5,2),(3,3),(5,5)]
+
+retirar :: Eq a => a -> [a] -> [a]
+retirar a [] = []
+retirar a (x:xs) = if a == x then retirar a xs else x : retirar a xs
+
+get_me_player_state :: [String] -> Int -> String
+get_me_player_state mapa player = get_aux mapa player where
+  get_aux (h:t) player | [head h] == show player = h
+                       | otherwise = get_aux t player 
+--ex: get_me_player_state ["#########","#       #","# #?#?# #","#  ?  ? #","#?# # #?#","# ?  ?  #","# #?#?# #","#  ??   #","#########","+ 5 2","+ 3 3","! 5 5","0 4 3"] 0
+get_me_player_coords :: String -> Ponto
+get_me_player_coords (a:b:c:d:e:xs) = (read [c] :: Int,read [e] :: Int)
+--ex: get_me_player_coords (get_me_player_state ["#########","#       #","# #?#?# #","#  ?  ? #","#?# # #?#","# ?  ?  #","# #?#?# #","#  ??   #","#########","+ 5 2","+ 3 3","! 5 5","0 4 3"] 0)

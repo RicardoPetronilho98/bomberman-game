@@ -1,0 +1,62 @@
+import Data.Char (isDigit)
+import System.Environment
+import Solucoes.Solucao1
+type Ponto = (Int,Int)
+
+--main :: IO ()
+--main = do a <- getArgs
+ --         let p = a !! 0
+  --        let c = a !! 1
+   --       w <- getContents
+    --      if length a == 2 && length p == 1 && isDigit (head p) && length c == 1 && head c `elem` "UDLRB"
+     --        then putStr $ unlines $ move (lines w) (read p) (head c)
+      --       else putStrLn "Parâmetros inválidos"
+
+
+--função Auxiliar que resulta no mapa sem as fronteiras (apenas onde os jogadores podem andar):
+skinMap :: [String] -> Int -> [String]
+skinMap map size = f1 size (drop 1 (take (size-1) map)) where
+    f1 _ [] = []
+    f1 size (x:xs) = drop 1 (take (size-1) x) : f1 size xs
+
+coord_bombs_Flames :: Int -> [Int] -> [Ponto]
+coord_bombs_Flames _ [] = []
+coord_bombs_Flames size (x:xs) = ((abs(((div x size)*size)-x+1)),(div x size)) : coord_bombs_Flames size xs
+
+--função que recebe coordenadas e indica caracter (map vai ser a skinMap):
+coordenadas :: Ponto -> [Int] -> Int -> Char
+coordenadas (l,c) lista size | l == 0 || l == (size-1) || c == 0 || c == (size-1) = '#'
+                             | even l && even c = '#' 
+                             | elem (l,c) (coord_bombs_Flames size lista) = '?'
+                             | otherwise = ' '    
+--ex: coordenadas (5,5) ((elemIndices '+' (drawMap1 0 9 0 (randomize_FULL (randomize 9 0)))) ++ (elemIndices '!' (drawMap1 0 9 0 (randomize_FULL (randomize 9 0))))) 9
+
+can_move :: Char -> Bool
+can_move x | x == ' ' = True
+           | otherwise = False
+
+--ex: can_move (coordenadas (3,1) ((elemIndices '+' (drawMap1 0 9 0 (randomize_FULL (randomize 9 0)))) ++ (elemIndices '!' (drawMap1 0 9 0 (randomize_FULL (randomize 9 0))))) 9) == True
+
+
+--função que certifica-se que é possivel fazer um determinado moviemnto (map vai ser a SkinMap):
+--move_check :: [String] -> Ponto -> Bool
+--move_check [] x = False
+--move_check map x | x == '#' || x == '?' = False
+                 -- otherwise = True
+
+
+--função que de acordo com um "move" indica o novo estado de jogo:
+--walk :: [String] -> Char -> Char -> Int -> Int -> [String]
+--walk _ _ _ _ 999 = [] --dir ssignifica direção
+--walk map player dir x y | dir == 'U' && move_check map x (y-1) == ' ' = new_Position map x (y-1) player 
+                        --dir == 'D' && move_check map x (y+1) == ' ' = new_Position map x (y+1) player
+                        --dir == 'L' && move_check map (x-1) y == ' ' = new_Position map (x-1) y player
+                        --dir == 'R' && move_check map (x+1) y == ' ' = new_Position map (x+1) y player
+                        --otherwise = map 
+                        
+--o map vai ser (mapa size seed) 
+--new_Position ::
+--new_Position map x (y-1) player 
+
+
+--move :: [String] -> Int -> Char -> [String]

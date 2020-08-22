@@ -1,0 +1,24 @@
+module Tarefa6_li1g145 where
+
+import AllF 
+
+bot :: [String] -> Int -> Int -> Maybe Char
+bot mapa player ticks = act (estado_de_jogo mapa) player
+
+{-
+
+bot :: [String] -> Int -> Int -> Maybe Char
+bot mapa player ticks = Nothing
+
+coord_do_bot :: Estado_de_jogo_T6 -> Numero_jogador -> Coordenada
+coord_do_bot (a,b,((J n coord _ ):xs)) x 
+    | n == x = coord 
+    | otherwise = coord_do_bot (a,b,xs) x
+
+dist_J_Bomba :: Jogador -> Estado_da_Bomba -> Float
+dist_J_Bomba (J _ (cj,lj) _) (Bomba_P (cb,lb,_,_,_)) = sqrt (fromIntegral((cj - cb)^2 + (lj - lb)^2))
+
+afasta_bomba :: Jogador -> Estado_de_jogo_T6 -> True
+afasta_bomba (J _ (cj,lj) _) ((Bomba_P (cb,lb,_,raio,_)):xs) | cj == cb && lj /= lb =   
+
+-}

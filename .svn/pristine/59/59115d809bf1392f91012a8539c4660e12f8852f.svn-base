@@ -1,0 +1,238 @@
+import Data.Char (isDigit)
+import System.Environment
+import Data.List
+type Ponto = (Int,Int)
+
+main :: IO ()
+main = do a <- getArgs
+          let p = a !! 0
+          let c = a !! 1
+          w <- getContents
+          if length a == 2 && length p == 1 && isDigit (head p) && length c == 1 && head c `elem` "UDLRB"
+             then putStr $ unlines $ move (lines w) (read p) (head c)
+             else putStrLn "Parâmetros inválidos"
+
+move :: [String] -> Int -> Char -> [String]
+move mapa player 'B' | can_i_plantB mapa player = justMap mapa ++ new_Coordinates mapa (get_dir 'B' (get_me_player_coords (words (get_me_player_state mapa player)))) (get_me_tuples (coordinates_to_words (get_me_Coordinates mapa))) ++ sort_all_bombs_player_state (coordinates_to_words (all_bombs_players_state mapa player)) ++ sort_players (all_players_state mapa player 'B')
+                     | otherwise = mapa
+move mapa player dir | can_i_move mapa (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player)))) = justMap mapa ++ new_Coordinates mapa (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player)))) (get_me_tuples (coordinates_to_words (get_me_Coordinates mapa))) ++ sort_players (all_players_state mapa player dir)
+                     | otherwise = mapa
+
+                  --dir == 'B' = mapa ++ [bomb_state (c,l) player raio] ++ [player_state player (c,l) p_ups] 
+--função que dada as coordenadas de um jogador indica as novas coordenadas dependendo da direção:
+get_dir :: Char -> Ponto -> Ponto
+get_dir dir (c,l) | dir == 'U' = (c,l-1) 
+                  | dir == 'D' = (c,l+1) 
+                  | dir == 'L' = (c-1,l) 
+                  | dir == 'R' = (c+1,l) 
+                  | dir == 'B' = (c,l)
+                 -- (ainda não sei se é preciso) dir == 'B' = (c,l)
+
+--função que recebe coordenadas e o mapa e indica se é possivel mover para esse espaço:
+can_i_move :: [String] -> Ponto -> Bool
+can_i_move mapa (c,l) = if l_aux mapa (c,l) 0 == ' ' then True else False where
+  l_aux (x:xs) (c,l) l1 | l == l1 = c_aux x c 0
+                        | otherwise = l_aux xs (c,l) (l1+1) 
+  c_aux (x:xs) c c1 | c == c1 = x 
+                    | otherwise = c_aux xs c (c1+1)
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--FUNÇÃO RESPONSAVEL PELA APRESENTAÇAO DO MAPA APENAS----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- É A FUNÇÃO USADA NA MOVE:
+--função que indica apenas o mapa do estado de jogo:
+justMap :: [String] -> [String]
+justMap (h:t) | head h == '#' = [h] ++ justMap t
+              | otherwise = []  
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--FUNÇÕES RESPONSAVEIS PELO ESTADO DAS COORDENADAS DOS POWER UPs-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--função que indica as coordenadas de todos os Power Ups (Flames e Bombs em String):
+get_me_Coordinates :: [String] -> [String]
+get_me_Coordinates mapa = aux_coord mapa where
+  aux_coord [] = []
+  aux_coord (h:t) | [head h] == "+" || [head h] == "!" = [h] ++ aux_coord t
+                  | otherwise = aux_coord t 
+--ex: get_Coordinates (mapa 9 0) = ["+ 5 2","+ 3 3","! 5 5"] 
+
+--converte as coordenadas de String para duplos:
+get_me_tuples :: [[String]] -> [Ponto]
+get_me_tuples [] = []
+get_me_tuples ((a:b:c:d):xs) = (read b :: Int,read c :: Int) : get_me_tuples xs  
+
+--função que indica apenas as coordenadas dos Flames (em String):
+get_me_Flame_Coordinates :: [String] -> [String]
+get_me_Flame_Coordinates mapa = aux_Fcoord mapa where
+  aux_Fcoord [] = []
+  aux_Fcoord (h:t) | [head h] == "!" = [h] ++ aux_Fcoord t
+                   | otherwise = aux_Fcoord t 
+
+--função que consoante as novas coordenadas (depois do jogador se mover) indica as novas coordenadas das Flames 
+--retira coordenadas Flames se o jogador a capturar
+new_Flame_Coordinates :: [String] -> Ponto -> [Ponto] -> [String]
+new_Flame_Coordinates mapa (c,l) h | elem (c,l) h = retirar ("+ " ++ show c ++ " " ++ show l) (get_me_Bomb_Coordinates mapa)
+                                   | otherwise = get_me_Flame_Coordinates mapa
+
+--função que indica apenas as coordenadas dos Bombs:
+get_me_Bomb_Coordinates :: [String] -> [String]
+get_me_Bomb_Coordinates mapa = aux_Bcoord mapa where
+  aux_Bcoord [] = []
+  aux_Bcoord (h:t) | [head h] == "+" = [h] ++ aux_Bcoord t
+                   | otherwise = aux_Bcoord t 
+
+--função que consoante as novas coordenadas (depois de se mover) de um jogador indica as novas coordenadas das Bombs 
+--retira coordenadas Bombs se o jogador a capturar
+new_Bomb_Coordinates :: [String] -> Ponto -> [Ponto] -> [String]
+new_Bomb_Coordinates mapa (c,l) h | elem (c,l) h = retirar ("! " ++ show c ++ " " ++ show l) (get_me_Flame_Coordinates mapa) 
+                                  | otherwise = get_me_Bomb_Coordinates mapa
+
+-- É A FUNÇÃO USADA NA MOVE:
+--função que junta as novas coordenadas Bombs e Flames:
+new_Coordinates :: [String] -> Ponto -> [Ponto] -> [String]
+new_Coordinates mapa (c,l) h = new_Bomb_Coordinates mapa (c,l) h ++ new_Flame_Coordinates mapa (c,l) h 
+--ex: new_Coordinates (mapa 9 0) (3,3) [(5,2),(3,3),(5,5)]
+
+--função auxiliar utilizada nas funções new_Bomb_Coordinates e new_Flame_Coordinates:
+retirar :: Eq a => a -> [a] -> [a]
+retirar a [] = []
+retirar a (x:xs) = if a == x then retirar a xs else x : retirar a xs
+
+--função auxiliar para converter as coordenadas de String para duplos (é utilizada também nos estados das Bombas):
+coordinates_to_words :: [String] -> [[String]]
+coordinates_to_words [] = []
+coordinates_to_words (x:xs) = [words x] ++ coordinates_to_words xs 
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---FUNÇÕES RESPONSAVEIS PELO ESTADO DO JOGADOR MOVIDO----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--função que dando uma mapa retorna o estado de jogo de um jogador: (ex: " 0 4 3")
+get_me_player_state :: [String] -> Int -> String
+get_me_player_state mapa player = get_aux mapa player where
+  get_aux (h:t) player | [head h] == show player = h
+                       | otherwise = get_aux t player 
+--ex: get_me_player_state ["#########","#       #","# #?#?# #","#  ?  ? #","#?# # #?#","# ?  ?  #","# #?#?# #","#  ??   #","#########","+ 5 2","+ 3 3","! 5 5","0 4 3"] 0 = " 0 4 3"
+
+--função que recebe o estado de jogo de um jogador e indica as suas coordenadas num túpulo:
+get_me_player_coords :: [String] -> Ponto
+get_me_player_coords (a:b:c:d) = (read b :: Int,read c :: Int)
+--ex: get_me_player_coords (get_me_player_state ["#########","#       #","# #?#?# #","#  ?  ? #","#?# # #?#","# ?  ?  #","# #?#?# #","#  ??   #","#########","+ 5 2","+ 3 3","! 5 5","0 4 3"] 0)
+
+--função que indica os Power_Ups já capturados pelo jogador:
+already_had_power_ups :: [String] -> Int -> String
+already_had_power_ups mapa player = drop 5 (get_me_player_state mapa player)
+
+--função que indica o novo Flame capturado a seguir ao estado do jogador:
+player_new_power_up_Flame :: [String] -> Int -> Char -> String
+player_new_power_up_Flame mapa player dir | elem (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player)))) (get_me_tuples ( coordinates_to_words (get_me_Flame_Coordinates mapa))) = " !"
+                                          | otherwise = []
+
+--função que indica o novo Bomb capturado a seguir ao estado do jogador:
+player_new_power_up_Bomb :: [String] -> Int -> Char -> String
+player_new_power_up_Bomb mapa player dir | elem (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player)))) (get_me_tuples (coordinates_to_words (get_me_Bomb_Coordinates mapa))) = " +"
+                                         | otherwise = []
+
+--função que indica TOTAL de Power Ups (power ups já obtidos antes + power ups Bombs capturados + power ups Flames capturados):
+player_ALL_power_ups :: [String] -> Int -> Char -> String
+player_ALL_power_ups [] _ _ = []
+player_ALL_power_ups mapa player dir = already_had_power_ups mapa player ++ player_new_power_up_Bomb mapa player dir ++ player_new_power_up_Flame mapa player dir
+
+--função que recebe as 6 funções a cima e indica o novo estado de jogo do jogador (depois de se mover):
+new_player_state :: [String] -> Int -> Char -> [String] 
+new_player_state mapa player dir = [show player ++ " " ++ show (fst (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player))))) ++ " " ++ show (snd (get_dir dir (get_me_player_coords (words (get_me_player_state mapa player))))) ++ player_ALL_power_ups mapa player dir]
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--FUNÇÕES RESPONSAVEIS PELO ESTADO DOS RESTANTES JOGADORES-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--função que indica apenas os sestado de jogo de todos os jogadores dando um mapa:
+just_players_state :: [String] -> [String]
+just_players_state [] = []
+just_players_state (h:t) | [head h] == "0" || [head h] == "1" || [head h] == "2" || [head h] == "3" = [h] ++ just_players_state t
+                         | otherwise = just_players_state t  
+
+--função que indica os estados de jogo dos jogadores sem contar com o jogador movido nessa jogada:
+other_players_state :: [String] -> Int -> [String] 
+other_players_state [] _ = []
+other_players_state (h:t) player | [head h] /= show player = [h] ++ other_players_state t player
+                                 | otherwise = other_players_state t player
+
+--função que indica o TOTAL de estados de jogo (jogador movido + outros jogadores não movidos):
+all_players_state :: [String] -> Int -> Char -> [String]
+all_players_state [] _ _ = []
+all_players_state mapa player dir = other_players_state (just_players_state mapa) player ++ new_player_state mapa player dir
+
+
+-- É A FUNÇÃO USADA NA MOVE:
+--função que ordena os estados de jogo de todos os jogdaores (0,1,2,3):
+sort_players :: [String] -> [String]
+sort_players [x] = [x]
+sort_players (h:t:w) | (read [head h] :: Int) < (read [head t] :: Int) = [h] ++ sort_players (t:w)
+                     | otherwise = sort_players (t:h:w)
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--FUNÇÕES RESPONSAVEIS PELO ESTADO DA BOMBA--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--função que indica apenas os estados de bomba (já plantadas no estado de jogo fornecido) em String:
+get_me_Bombs_state :: [String] -> [String]
+get_me_Bombs_state mapa = aux_Bomb_state mapa where
+  aux_Bomb_state [] = []
+  aux_Bomb_state (h:t) | [head h] == "*" = [h] ++ aux_Bomb_state t
+                       | otherwise = aux_Bomb_state t 
+
+--função que converte as coordenadas das bombas plantadas (em String) para duplos:
+bomb_planted_coordinates :: [[String]] -> [Ponto]
+bomb_planted_coordinates [] = []
+bomb_planted_coordinates ([a,b,c,d,e,f]:xs) = (read b :: Int,read c :: Int) : bomb_planted_coordinates xs  
+
+--função que indica quantas bombas o jogador já tem plantadas:
+how_many_bombs_already_planted :: [[String]] -> Int -> Int
+how_many_bombs_already_planted [] _ = 0
+how_many_bombs_already_planted ([a,b,c,d,e,f]:xs) player | (show player) == d = 1 + how_many_bombs_already_planted xs player
+                                                         | otherwise = how_many_bombs_already_planted xs player
+
+--função que indica quantas bombas o jogador pode plantar consoante o número de power ups bombs:
+how_many_bombs_can_i_plant :: String -> Int
+how_many_bombs_can_i_plant [] = 1
+how_many_bombs_can_i_plant (x:xs) | x == '+' = 1 + how_many_bombs_can_i_plant xs
+                                  | otherwise = how_many_bombs_can_i_plant xs
+
+--função que indica o raio da bomba:
+bomb_raio :: String -> Int
+bomb_raio [] = 1
+bomb_raio (x:xs) | x == '!' = 1 + bomb_raio xs
+                 | otherwise = bomb_raio xs  
+
+--função que indica o estado da bomba plantada dependendo do jogador e do mapa:
+plant_Bomb :: [String] -> Int -> [String]
+plant_Bomb mapa player = ["* " ++ show (fst (get_me_player_coords (words (get_me_player_state mapa player)))) ++ " " ++ show (snd (get_me_player_coords (words (get_me_player_state mapa player)))) ++ " " ++ show player ++ " " ++ show (bomb_raio (already_had_power_ups mapa player)) ++ " 10"]
+
+--função que verifica se é possível o jogador plantar uma bomba:
+can_i_plantB :: [String] -> Int -> Bool
+can_i_plantB mapa player | elem (get_me_player_coords (words (get_me_player_state mapa player))) (bomb_planted_coordinates (coordinates_to_words (get_me_Bombs_state mapa))) = False
+                         | otherwise = if how_many_bombs_can_i_plant (get_me_player_state mapa player) > how_many_bombs_already_planted (coordinates_to_words (get_me_Bombs_state mapa)) player then True else False  
+
+--função que indica os estados de jogo dos jogadores sem contar com o jogador movido nessa jogada:
+other_players_Bomb_state :: [[String]] -> Int -> [String] 
+other_players_Bomb_state [] _ = []
+other_players_Bomb_state ([a,b,c,d,e,f]:xs) player | d /= show player = [unwords [a,b,c,d,e,f]] ++ other_players_Bomb_state xs player
+                                                   | otherwise = other_players_Bomb_state xs player
+
+all_bombs_players_state :: [String] -> Int -> [String]
+all_bombs_players_state mapa player = plant_Bomb mapa player ++ other_players_Bomb_state (coordinates_to_words (get_me_Bombs_state mapa)) player
+
+sort_all_bombs_player_state :: [[String]] -> [String]
+sort_all_bombs_player_state [] = []
+sort_all_bombs_player_state [[a,b,c,d,e,f]] = [unwords [a,b,c,d,e,f]]
+sort_all_bombs_player_state [[a,b,c,d,e,f],[g,h,i,j,k,l]] | c < i = [unwords [a,b,c,d,e,f]] ++ [unwords [g,h,i,j,k,l]]
+                                                          | c > i = [unwords [g,h,i,j,k,l]] ++ [unwords [a,b,c,d,e,f]]
+                                                          | c == i = if b < h then [unwords [a,b,c,d,e,f]] ++ [unwords [g,h,i,j,k,l]] else [unwords [g,h,i,j,k,l]] ++ [unwords [a,b,c,d,e,f]]
+sort_all_bombs_player_state ([a,b,c,d,e,f]:[g,h,i,j,k,l]:xs) | c < i = [unwords [a,b,c,d,e,f]] ++ sort_all_bombs_player_state ([g,h,i,j,k,l]:xs)
+                                                             | c > i = sort_all_bombs_player_state ([g,h,i,j,k,l]:[a,b,c,d,e,f]:xs)  
+                                                             | c == i = if b < h then [unwords [a,b,c,d,e,f]] ++ sort_all_bombs_player_state ([g,h,i,j,k,l]:xs) else sort_all_bombs_player_state ([g,h,i,j,k,l]:[a,b,c,d,e,f]:xs)
+
+

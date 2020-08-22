@@ -1,0 +1,83 @@
+module Main where
+
+import AllF
+import Graphics.Gloss         
+import Graphics.Gloss.Data.Picture  
+import Graphics.Gloss.Interface.Pure.Game
+
+-- | Uma representação do estado do jogo.
+type Estado = (Estado_de_jogo, Figuras)
+
+data Figuras = Figuras { tijolo :: Picture, pedra :: Picture, relva :: Picture, jogador :: Picture }
+
+-- | O estado inicial do jogo.
+estadoInicial :: IO Estado
+estadoInicial = do
+  fig1 <- loadBMP "tijolo.bmp"
+  fig2 <- loadBMP "pedra.bmp"
+  fig3 <- loadBMP "relva.bmp"
+  fig4 <- loadBMP "jogador.bmp"
+  let l_figuras = Figuras fig1 fig2 fig3 fig4
+  return (e_j,l_figuras) where e_j = estado_de_jogo (mapa 9 0)
+ 
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+-- | Função que desenha o jogo.
+desenhaEstado :: Estado -> Picture
+desenhaEstado ((a,b,c,d),figuras) = Pictures $ aux_desenha_estado d k k (-k) 0 (aux_get_figuras (lista,figuras)) figuras
+       where lista = concat a
+             k = fromIntegral (div (length a) 2)
+             d = length a
+
+
+aux_get_figuras :: ([Celulas],Figuras) -> [Picture]
+aux_get_figuras ([],_) = [] 
+aux_get_figuras ((x:xs),figuras) | x == Pedra = pedra figuras : aux_get_figuras (xs,figuras)
+                                 | x == Vazio = relva figuras : aux_get_figuras (xs,figuras)
+                                 | x == Tijolo = tijolo figuras : aux_get_figuras (xs,figuras)
+--d = dimensao do mapa
+--w = div DIM 2
+--k = div DIM 2
+--l coorresponde á linha inicial = -(div DIM 2:)
+--v começam e 0
+--60 é a unidade, pois cada imagem é de 60 por 60:
+aux_desenha_estado :: Int -> Float -> Float -> Float -> Int -> [Picture] -> Figuras -> [Picture]
+aux_desenha_estado _ _ _ _ _ [] _ = []
+aux_desenha_estado d w k l v (x:xs) u 
+    | v == 1 && l == (-w+1) || v == (d-2) && l == (-w+1) || v == 1 && l == (w-1) || v == (d-2) && l == (w-1) = Translate (-60*k) (-60*l) (jogador u) : aux_desenha_estado d w (k-1) l (v+1) xs u 
+    | v < d = Translate (-60*k) (-60*l) x : aux_desenha_estado d w (k-1) l (v+1) xs u
+    | otherwise = aux_desenha_estado d w w (l+1) 0 (x:xs) u
+
+ --(1,1) (7,1) (1,7) (7,7)
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
+
+-- | Função que altera o estado do jogo quando acontece um evento.
+reageEvento :: Event -> Estado -> Estado
+reageEvento e s = s
+
+-- | Função que altera o estado do jogo quando o tempo avança @n@ segundos.
+reageTempo :: Float -> Estado -> Estado
+reageTempo f s = s
+
+-- | Frame rate
+fr :: Int
+fr = 50
+
+-- | Display mode
+dm :: Display
+dm = InWindow "Novo Jogo" (800, 600) (0, 0)
+    
+-- | Função principal que invoca o jogo.
+main :: IO ()
+main = do inicio <- estadoInicial 
+          play dm              -- display mode
+               (greyN 0.5)     -- côr do fundo da janela
+               fr              -- frame rate
+               inicio   -- estado inicial
+               desenhaEstado   -- desenha o estado do jogo
+               reageEvento     -- reage a um evento
+               reageTempo      -- reage ao passar do tempo
+

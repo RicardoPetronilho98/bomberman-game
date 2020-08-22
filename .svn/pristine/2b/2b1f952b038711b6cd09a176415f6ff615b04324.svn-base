@@ -1,0 +1,253 @@
+module Main where
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+import Tarefa6_li1g145 (bot)
+
+main :: IO ()
+main = do
+    a <- getArgs
+    let player = readMaybe (a !! 0)
+    let ticks = readMaybe (a !! 1)
+    w <- getContents
+    if isJust player && isJust ticks
+        then putStr $ show $ bot (lines w) (fromJust player) (fromJust ticks)
+        else putStrLn "Parâmetros inválidos"
+
+{-
+
+data Celulas = Pedra | Tijolo | Vazio deriving (Show,Eq)
+data Power_Up = PU_Bomba Coordenada | PU_Flame Coordenada deriving (Show,Eq)
+data Estado_da_Bomba = Bomba_P Quintuplo deriving (Show,Eq)
+data Jogador = J Int Coordenada PUs deriving (Show,Eq)
+--data Dir = 
+
+type Numero_jogador = Int
+type Tempo = Int
+type Dimensao_do_Mapa = Int
+type Numero_blocos_meio = Int
+type Mapa_Original = [String]
+type Mapa = [[Celulas]]
+type Power_Ups = [Power_Up]
+type Estado_do_Power_Up = String
+type Coordenada = (Int,Int)
+type Quintuplo = (Int,Int,Int,Int,Int)
+type Jogadores = [Jogador]
+type PUs = String
+type Estado_de_jogo = (Mapa, Power_Ups, [Estado_da_Bomba], Jogadores)
+type Raio_da_bomba = Int
+type Lista_de_Coordenadas = [(Int,Int)]
+type Raio_Coordenadas = [(Int,Int)]
+type Mapa_Auxiliar = [[Int]]  
+type Action = Char
+type Bomba_Dist = (Char, Int)
+type Jogada = (Action, Int)
+type Jogadas = [Jogada]
+type Possible_Action = (Action, Action)
+
+--Função principal do bot
+act :: Estado_de_jogo -> Numero_jogador -> Maybe Char
+act state@(a,b,c,d) n | minSafetyLevel state (findPlayerCoords d n) < 2 = evade state n
+				           	  | otherwise = attack state n
+
+--Função que dirige o bot na direção dos powerUps
+attack :: Estado_de_jogo -> Numero_jogador -> Maybe Char
+attack state n | nearestBrick state n /= (-1,-1) && nearestPowerUp state n == (-1,-1) = blowBricks state n
+               | nearestPowerUp state n /= (-1,-1) = goTo state n (nearestPowerUp state n)
+			   | otherwise = middleAndBomb state n
+
+--Função que comanda o bot para o meio do mapa, para deixar lá uma bomba
+middleAndBomb :: Estado_de_jogo -> Numero_jogador -> Maybe Char
+middleAndBomb state@(a,b,c,d) n | dist < 2 = Just 'B' 
+					            | otherwise = goTo state n (findMiddle a)
+					            where
+					 	          dist = distance (findPlayerCoords d n) (findMiddle a)
+
+--Comanda o bot para alcançar e destruir o tijolo mais perto
+blowBricks :: Estado_de_jogo -> Numero_jogador -> Maybe Char
+blowBricks state@(a,b,c,d) n | distance (findPlayerCoords d n) (nearestBrick state n) == 1 = Just 'B'
+					         | otherwise = goTo state n (nearestBrick state n) 
+
+--Calcula a coordenada do tijolo mais próximo
+nearestBrick :: Estado_de_jogo -> Numero_jogador -> Coordenada
+nearestBrick (a,b,c,d) n = nearest (findPlayerCoords d n) (listBrickCoords a 0)
+
+--Lista as coordenadas dos tijolos
+listBrickCoords :: Mapa -> Int -> Lista_de_Coordenadas
+listBrickCoords [] _ = []
+listBrickCoords (h:ts) n | length (xBrickCoords 0 h) == 0 = listBrickCoords ts (n+1) 
+					     | otherwise = (listBrickCoordsAux (xBrickCoords 0 h) n) ++ (listBrickCoords ts (n+1))  where
+					     listBrickCoordsAux [] _ = []
+					     listBrickCoordsAux (h:ts) n = (h, n) : listBrickCoordsAux ts n
+					     xBrickCoords _ [] = []
+					     xBrickCoords n (h:ts) = if h == Tijolo then n : xBrickCoords (n+1) ts 
+					     	                     else xBrickCoords (n+1) ts
+
+
+--Função que encontra o meio do mapa
+findMiddle :: Mapa -> Coordenada
+findMiddle mapa = (mid, mid) where mid = (div (length mapa) 2) + 1 
+
+--Dada uma coordenada (em termos de distância , vai escolher o próximo passo seguro para chegar lá
+goTo :: Estado_de_jogo -> Numero_jogador -> Coordenada -> Maybe Char
+goTo state@(a,b,c,d) n (c1,c2) | c1 < 0 && (minSafetyLevel state (x-1,y) > 1) && (isValid a (findPlayer d n) 'L') == True = Just 'L'
+				               | c1 > 0 && (minSafetyLevel state (x+1,y) > 1) && (isValid a (findPlayer d n) 'R') == True = Just 'R'
+					           | c2 < 0 && (minSafetyLevel state (x,y-1) > 1) && (isValid a (findPlayer d n) 'U') == True = Just 'U'
+					           | c2 > 0 && (minSafetyLevel state (x,y+1) > 1) && (isValid a (findPlayer d n) 'D') == True = Just 'D'
+					           | otherwise = evade state n
+					           where
+					       	    (x,y) = findPlayerCoords d n
+					
+--calcula a coordenada do Power Up mais próximo
+nearestPowerUp :: Estado_de_jogo -> Numero_jogador -> Coordenada
+nearestPowerUp (a,[],c,d) _ = (-1,-1)
+nearestPowerUp (a,b,c,d) n = nearest (findPlayerCoords d n) (puCoords b) 
+
+--transforma o tipo Power_ups numa lista de coordenadas
+puCoords :: Power_Ups -> [Coordenada]
+puCoords [] = []
+puCoords ((PU_Bomba c):ts) = c : (puCoords ts)
+puCoords ((PU_Flame c):ts) = c : (puCoords ts) 
+
+--distância entre uma coordenada e a coordenada mais perto desta, entre uma lista de coordenadas
+nearest :: Coordenada -> [Coordenada] -> Coordenada
+nearest _ [] = (-1,-1)
+nearest a [x] = distCoords a x 
+nearest a (h:t:ts) | distance a h < distance a t = nearest a (h:ts)
+					   | otherwise = nearest a (t:ts)					   
+
+--distância entre duas coordenadas
+distance :: Coordenada -> Coordenada -> Int
+distance (a,b) (c,d) = abs (c-a) + abs (d-b)
+
+--distância entre duas coordenadas em coordenadas
+distCoords :: Coordenada -> Coordenada -> Coordenada
+distCoords (a,b) (c,d) = (c-a, d-b)
+
+--serve para o reageEvento do bot na T5 para receber o mesmo estado_de_jogo mas apenas com os Power_Ups destapados, de forma a simular uma situação de jogo real.
+power_ups_destapados :: Estado_de_jogo -> Estado_de_jogo
+power_ups_destapados (a,b,c,d) = (a,aux a b,c,d) where
+   aux _ [] = []
+   aux a (x@(PU_Bomba coord):xs) | qual_o_caracter a coord == Vazio = x : aux a xs 
+                                 | otherwise = aux a xs
+   aux a (x@(PU_Flame coord):xs) | qual_o_caracter a coord == Vazio = x : aux a xs 
+                                 | otherwise = aux a xs
+
+--Dado o estado de jogo, devolve a jogada que deve ser efetuada pelo bot (defensiva)
+evade :: Estado_de_jogo -> Numero_jogador -> Maybe Char
+evade estado@(mapa, power_ups, bombas, jogadores) n = firstValid mapa (findPlayer jogadores n) (dirBySafety estado (findPlayerCoords jogadores n))
+
+coord_do_bot :: Estado_de_jogo -> Numero_jogador -> Coordenada
+coord_do_bot (a,b,c,((J n coord _ ):xs)) x 
+    | n == x = coord 
+    | otherwise = coord_do_bot (a,b,c,xs) x
+
+--Verifica se uma acção é válida no mapa
+isValid :: Mapa -> Jogador -> Char -> Bool
+isValid map (J _ (x,y) pu ) c | c == 'U' && ((qual_o_caracter map (x, y - 1)) == Vazio) = True
+                              | c == 'D' && ((qual_o_caracter map (x, y + 1)) == Vazio) = True
+                              | c == 'L' && ((qual_o_caracter map (x - 1, y)) == Vazio) = True
+                              | c == 'R' && ((qual_o_caracter map (x + 1, y)) == Vazio) = True
+                              | c == 'B' && (length pu /= 0) = True
+                              | otherwise = False
+
+--Dado o número de um jogador, devolve o Jogador correspondente
+findPlayer :: Jogadores -> Numero_jogador -> Jogador
+findPlayer ((J j coords pus):js) n | j == n = (J j coords pus)
+                   | otherwise = findPlayer js n
+
+--Dado o número de um jogador, devolve as coordenadas do Jogador correspondente
+findPlayerCoords :: Jogadores -> Numero_jogador -> Coordenada
+findPlayerCoords jogadores n = let (J j coords pus) = findPlayer jogadores n
+                 in coords
+
+--Dada a lista de direções e o nivel de perigo de cada, organizada por ordem crescente de perigo, seleciona a primeira jogada válida
+firstValid :: Mapa -> Jogador -> Jogadas -> Maybe Char
+firstValid _ _ [] = Nothing
+firstValid mapa player (h:ts) = let action = fst h
+                    in if (isValid mapa player action) == True then Just action
+                     else firstValid mapa player ts
+                     
+
+-- Funções que organizam uma lista de jogadas de forma crescente de perigo (decrescente de segurança)
+decrescent :: Jogadas -> Jogadas
+decrescent [x] = [x]
+decrescent list = (decrescentAux1 list : decrescent (decrescentAux2 list))
+
+decrescentAux2 :: Jogadas -> Jogadas
+decrescentAux2 [x] = []
+decrescentAux2 (h:s:ts) | (snd h) > (snd s) = s : (decrescentAux2 (h:ts))
+                        | otherwise = h : (decrescentAux2 (s:ts))
+
+decrescentAux1 :: Jogadas -> Jogada
+decrescentAux1 [x] = x
+decrescentAux1 (h:s:ts) | (snd h) > (snd s) = decrescentAux1 (h:ts)
+                        | otherwise = decrescentAux1 (s:ts)
+
+---------
+
+--Dado o estado de jogo e a posição de um jogador, devolve a lista de niveis de perigo das 4 direçoes, ordenada por perigo crescente
+dirBySafety :: Estado_de_jogo -> Coordenada -> Jogadas
+dirBySafety estado@(mapa,pu_s,bombs,jogadores) (xp, yp) = 
+  decrescent [('L',minSafetyLevel estado (xp-1, yp)),('U',minSafetyLevel estado (xp, yp-1)),('R',minSafetyLevel estado (xp+1, yp)),('D',minSafetyLevel estado (xp, yp+1))] 
+
+--Funções que calculam o perigo associado a uma coordenada do mapa, usando como factores o tempo que falta para as bombas explodirem
+--e se estão no alcance da próxima jogada
+minSafetyLevel :: Estado_de_jogo -> Coordenada -> Int
+minSafetyLevel state@(a,b,c,d) coord = minimum (safetyAux state coord c) where
+  safetyAux _ _ [] = [10]
+  safetyAux estado x (h:ts) = safetyLevel estado x h : safetyAux estado x ts
+
+safetyLevel :: Estado_de_jogo -> Coordenada -> Estado_da_Bomba -> Int
+safetyLevel estado j_coords bomba@(Bomba_P (xb,yb,pl,range,time)) | withinRange estado j_coords bomba = time - 1
+                                                                  | otherwise = 10
+
+withinRange :: Estado_de_jogo -> Coordenada -> Estado_da_Bomba -> Bool
+withinRange estado j_coord bomba | elem j_coord (raio_acao_bomba estado bomba) = True
+                                 | otherwise = False 
+---------
+
+--vem da T4
+qual_o_caracter :: Mapa -> Coordenada -> Celulas 
+qual_o_caracter mapa (c,l) = l_aux mapa (c,l) 0 where 
+    l_aux (x:xs) (c,l) l1 | l == l1 = c_aux x c 0
+                          | otherwise = l_aux xs (c,l) (l1+1) 
+    c_aux (x:xs) c c1 | c == c1 = x 
+                      | otherwise = c_aux xs c (c1+1)
+
+
+--determina as coordenadas das chamas na esplosão da bomba consoante o mapa dado (se a chama atingir um '#' é bloqueada, se atingir um '?' faz esplodir esse elemento mas depois é bloqueada, noutro caso qualquer esplode esse elemento):
+raio_acao_bomba :: Estado_de_jogo -> Estado_da_Bomba -> Raio_Coordenadas
+raio_acao_bomba (a,b,_,_) (Bomba_P (c,l,_,raio,_)) = cima a (c,l-1) raio e ++ baixo a (c,l+1) raio e ++ direita a (c+1,l) raio e ++ esquerda a (c-1,l) raio e ++ [(c,l)] where 
+    e = converter_P_Ups_em_Coords b
+    cima _ _ 0 _ = []
+    cima mapa (c,l) n powerUps | qual_o_caracter mapa (c,l) == Pedra = []
+                               | qual_o_caracter mapa (c,l) == Tijolo || elem (c,l) powerUps = [(c,l)]
+                               | otherwise = [(c,l)] ++ cima mapa (c,l-1) (n-1) powerUps
+    baixo _ _ 0 _ = []
+    baixo mapa (c,l) n powerUps | qual_o_caracter mapa (c,l) == Pedra = []
+                                | qual_o_caracter mapa (c,l) == Tijolo || elem (c,l) powerUps = [(c,l)]
+                                | otherwise = [(c,l)] ++ baixo mapa (c,l+1) (n-1) powerUps
+    direita _ _ 0 _ = []
+    direita mapa (c,l) n powerUps | qual_o_caracter mapa (c,l) == Pedra = []
+                                  | qual_o_caracter mapa (c,l) == Tijolo || elem (c,l) powerUps = [(c,l)]
+                                  | otherwise = [(c,l)] ++ direita mapa (c+1,l) (n-1) powerUps
+    esquerda _ _ 0 _ = []
+    esquerda mapa (c,l) n powerUps | qual_o_caracter mapa (c,l) == Pedra = []
+                                   | qual_o_caracter mapa (c,l) == Tijolo || elem (c,l) powerUps = [(c,l)]
+                                   | otherwise = [(c,l)] ++ esquerda mapa (c-1,l) (n-1) powerUps   
+--raio_acao_bomba mapa3 (Bomba (3,5,2,1,10)) [(5,2),(3,3),(5,5)] = [(3,4),(3,6),(4,5),(2,5),(3,5)]  
+
+--recebe o estado de todos os Power Ups no mapa e indica as suas coordenadas numa lista:
+converter_P_Ups_em_Coords :: Power_Ups -> Lista_de_Coordenadas
+converter_P_Ups_em_Coords [] = []
+converter_P_Ups_em_Coords (x:xs) = [pu_coords x] ++ converter_P_Ups_em_Coords xs                    
+
+--determina as coordenadas de um Power_Up (a sua localização no mapa):
+pu_coords :: Power_Up -> Coordenada
+pu_coords (PU_Bomba coord) = coord
+pu_coords (PU_Flame coord) = coord 
+
+-}
